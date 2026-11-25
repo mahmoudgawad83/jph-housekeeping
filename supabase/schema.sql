@@ -254,6 +254,11 @@ create policy photos_write on storage.objects for insert to authenticated
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on all tables in schema public to authenticated;
 grant usage, select on all sequences in schema public to authenticated;
+-- The report engine (GitHub Actions) uses the secret / service_role key.
+grant usage on schema public to service_role;
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+grant execute on all functions in schema public to service_role;
 grant execute on function public.is_admin() to authenticated;
 grant execute on function public.my_bloc_ids() to authenticated;
 
