@@ -154,7 +154,7 @@ function topbar({ backTo, title } = {}) {
     : '';
   return `<header class="topbar">
     ${backTo ? `<a class="btn ghost icon-btn" href="${backTo}" aria-label="${esc(t('back'))}">${icon('back')}</a><h1 class="grow" style="font-size:18px">${esc(title || '')}</h1>`
-             : `<div class="brand grow"><span class="brand-mark">${icon('spark')}</span><span>${esc(t('appName'))}</span></div>`}
+             : `<div class="brand grow"><img class="brand-logo" src="brand/jesa-logo.png" alt="JESA" width="379" height="88"><span class="brand-sep" aria-hidden="true"></span><span class="brand-name">${esc(t('appName'))}</span></div>`}
     ${blocSelect}
     <div style="position:relative">
       <button class="btn ghost icon-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false" aria-label="Menu">${icon('more')}</button>
@@ -181,7 +181,7 @@ function bindTopbar() {
 // ───────── Login ─────────
 function renderLogin() {
   $app.innerHTML = `<main id="main" class="login"><form class="card stack" id="loginForm" novalidate>
-    <div class="row"><span class="brand-mark">${icon('spark')}</span><h1>${esc(t('appName'))}</h1></div>
+    <div class="login-brand"><img src="brand/jesa-logo.png" alt="JESA" width="379" height="88"><h1>${esc(t('appName'))}</h1><p class="small muted">JPH – Jorf Phosphate Hub</p></div>
     <p class="muted small">${esc(t('signInHelp'))}</p>
     <label class="field"><span class="lbl">${esc(t('username'))}</span>
       <input class="input" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>

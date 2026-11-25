@@ -1,6 +1,6 @@
 // App-shell cache: the app opens even with a weak connection. Data calls are never cached.
-const CACHE = 'jph-v4';
-const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'i18n.js', 'config.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png'];
+const CACHE = 'jph-v5';
+const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'i18n.js', 'config.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'brand/jesa-logo.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
