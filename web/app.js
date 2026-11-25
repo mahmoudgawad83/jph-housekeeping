@@ -42,6 +42,7 @@ const ICONS = {
   download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path class="tone" d="M4 15v2a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-2z"/><path d="M4 15v2a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-2"/>',
   layers: '<path class="tone" d="m12 3 9 5-9 5-9-5z"/><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 12.5 9 5 9-5M3 16.5l9 5 9-5"/>',
   image: '<rect class="tone" x="3" y="4" width="18" height="16" rx="3"/><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 9"/>',
+  chart: '<rect class="tone" x="3" y="3" width="18" height="18" rx="4"/><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 16v-3.5M12 16V8M16 16v-5.5"/>',
   // Category icons
   cat_spillage: '<ellipse class="tone" cx="12" cy="18.5" rx="8" ry="2.5"/><ellipse cx="12" cy="18.5" rx="8" ry="2.5"/><path d="M12 3.5s-4 4.6-4 7.6a4 4 0 0 0 8 0c0-3-4-7.6-4-7.6z"/>',
   cat_waste: '<path class="tone" d="M6.5 8h11l-1 11.5a1.8 1.8 0 0 1-1.8 1.5H9.3a1.8 1.8 0 0 1-1.8-1.5z"/><path d="M6.5 8h11l-1 11.5a1.8 1.8 0 0 1-1.8 1.5H9.3a1.8 1.8 0 0 1-1.8-1.5zM4.5 8h15M9.5 8V5.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V8M10.5 12v5M13.5 12v5"/>',
@@ -203,6 +204,7 @@ async function route() {
   }
   if (h.startsWith('#/new')) return renderNew();
   if (h.startsWith('#/open')) { state.filter = 'open'; return renderMap(); }
+  if (h.startsWith('#/stats')) return renderStats();
   if (h.startsWith('#/obs/')) return renderDetail(h.slice(6));
   if (h.startsWith('#/admin') && isAdmin()) return renderAdmin(h.split('/')[2] || 'blocs');
   return renderMap();
@@ -213,7 +215,7 @@ window.addEventListener('hashchange', () => route().catch(fail));
 function bottomNav(active) {
   const items = [
     ['map', '#/', 'map', t('map')],
-    ['open', '#/open', 'list', t('open')],
+    ['stats', '#/stats', 'chart', t('stats')],
     ['new', '#/new', 'camera', t('newShort')],
     ...(isAdmin() ? [['admin', '#/admin', 'shield', t('admin')]] : []),
   ];
@@ -316,7 +318,7 @@ async function renderMap() {
     </div>
     <section class="list" id="list" aria-busy="true"><p class="muted">…</p></section>
   </main>
-  ${bottomNav(state.filter === 'open' ? 'open' : 'map')}`;
+  ${bottomNav('map')}`;
   bindTopbar(); bindBottomNav();
   $app.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { state.filter = b.dataset.f; renderMap(); }));
 
@@ -354,6 +356,96 @@ function obsCard(o, url) {
 const catBadge = (c) => `<span class="badge cat">${icon(catIcon(c))}${esc(catLabel(c))}</span>`;
 const sevBadge = (s) => `<span class="badge sev-${esc(s)}">${esc(sevLetter(s))} · ${esc(sevLabel(s))}</span>`;
 const statusBadge = (s) => `<span class="badge st-${esc(s)}">${esc(s === 'closed' ? t('statusClosed') : t('statusOpen'))}</span>`;
+
+// ───────── Statistics (only Blocs the user may see; the database enforces it too) ─────────
+async function renderStats() {
+  if (!state.myBlocIds.length) {
+    $app.innerHTML = topbar() + `<main id="main" class="page"><div class="card empty">${esc(t('noBlocs'))}</div></main>${bottomNav('stats')}`;
+    bindTopbar(); bindBottomNav(); return;
+  }
+  state.statsBloc = state.statsBloc ?? (state.myBlocIds.length > 1 ? 'all' : String(state.myBlocIds[0]));
+  state.statsPeriod = state.statsPeriod || '7';
+  const periods = [['1', t('today')], ['7', t('period7')], ['30', t('period30')]];
+  $app.innerHTML = topbar({ backTo: '#/', title: t('stats') }) + `<main id="main" class="page stack">
+    <div class="stats-filters">
+      <label class="sr" for="stBloc">${esc(t('bloc'))}</label>
+      <select id="stBloc" class="input">${state.myBlocIds.length > 1 ? `<option value="all">${esc(t('allMyBlocs'))}</option>` : ''}
+        ${state.myBlocIds.map((id) => `<option value="${id}">${esc(blocName(id))}</option>`).join('')}</select>
+      <div class="seg" role="group" aria-label="${esc(t('period'))}">${periods.map(([k, l]) => `<button data-p="${k}" aria-pressed="${state.statsPeriod === k}">${esc(l)}</button>`).join('')}</div>
+    </div>
+    <div id="stBody" aria-busy="true"><p class="muted">…</p></div>
+  </main>${bottomNav('stats')}`;
+  bindTopbar(); bindBottomNav();
+  const sel = document.getElementById('stBloc'); sel.value = state.statsBloc;
+  sel.onchange = () => { state.statsBloc = sel.value; renderStats(); };
+  $app.querySelectorAll('[data-p]').forEach((b) => (b.onclick = () => { state.statsPeriod = b.dataset.p; renderStats(); }));
+  try { await fillStats(); } catch (e) { fail(e); }
+}
+
+async function fillStats() {
+  const ids = state.statsBloc === 'all' ? state.myBlocIds : [Number(state.statsBloc)];
+  const days = Number(state.statsPeriod);
+  const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - (days - 1));
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('observations').select('id, bloc_id, supervisor_id, created_at, closed_at, area, category, severity, status')
+      .in('bloc_id', ids).gte('created_at', start.toISOString()).order('created_at').range(from, from + 999);
+    if (error) throw error; rows.push(...data); if (data.length < 1000) break;
+  }
+  const [{ count: openNow }, { data: closedRows }] = await Promise.all([
+    sb.from('observations').select('id', { count: 'exact', head: true }).in('bloc_id', ids).eq('status', 'open'),
+    sb.from('observations').select('created_at, closed_at').in('bloc_id', ids).gte('closed_at', start.toISOString()).limit(5000),
+  ]);
+  const body = document.getElementById('stBody'); if (!body) return;
+  body.setAttribute('aria-busy', 'false');
+  const count = (key) => { const m = new Map(); rows.forEach((r) => m.set(r[key], (m.get(r[key]) || 0) + 1)); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
+  const hours = (closedRows || []).filter((r) => r.closed_at).map((r) => (new Date(r.closed_at) - new Date(r.created_at)) / 3600000).sort((a, b) => a - b);
+  const median = hours.length ? hours[Math.floor(hours.length / 2)] : null;
+  const fmtH = (h) => (h == null ? '—' : h < 1 ? `${Math.round(h * 60)} min` : h < 48 ? `${h.toFixed(1)} h` : `${(h / 24).toFixed(1)} ${t('daysShort')}`);
+  const high = rows.filter((r) => r.severity === 'high' || r.severity === 'critical').length;
+
+  // Trend: per hour today (06–20h), per day otherwise.
+  let trend;
+  if (days === 1) {
+    trend = Array.from({ length: 15 }, (_, i) => ({ k: `${String(i + 6).padStart(2, '0')}h`, n: rows.filter((r) => new Date(r.created_at).getHours() === i + 6).length }));
+  } else {
+    trend = Array.from({ length: days }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); const key = localDate(d);
+      return { k: d.toLocaleDateString(locale(), { day: '2-digit', month: '2-digit' }), n: rows.filter((r) => localDate(new Date(r.created_at)) === key).length }; });
+  }
+  const maxT = Math.max(1, ...trend.map((x) => x.n));
+  const labelEvery = trend.length > 15 ? 5 : 1;
+  const trendHtml = `<div class="vbars" role="img" aria-label="${esc(t('trend'))}">${trend.map((x, i) => `
+    <div class="vbar" title="${esc(x.k)}: ${x.n}"><span class="vbar-n">${x.n || ''}</span><span class="vbar-fill" style="height:${(x.n / maxT) * 100}%"></span>
+      <span class="vbar-k">${i % labelEvery === 0 ? esc(x.k) : ''}</span></div>`).join('')}</div>`;
+
+  const hbars = (items, labelFn, opts = {}) => {
+    if (!items.length) return `<p class="muted small">${esc(t('noDataPeriod'))}</p>`;
+    const max = Math.max(...items.map((x) => x[1]));
+    return `<ul class="hbars">${items.map(([k, n]) => `<li title="${esc(String(labelFn(k)).replace(/<[^>]+>/g, ''))}: ${n}">
+      <span class="hb-label">${labelFn(k)}</span>
+      <span class="hb-track"><span class="hb-fill ${opts.cls ? opts.cls(k) : ''}" style="width:${Math.max(3, (n / max) * 100)}%"></span></span>
+      <span class="hb-n">${n}</span></li>`).join('')}</ul>`;
+  };
+  const sevOrder = ['critical', 'high', 'medium', 'low'];
+  const bySev = sevOrder.map((k) => [k, rows.filter((r) => r.severity === k).length]).filter(([, n]) => n);
+  const areas = count('area').filter(([a]) => a).slice(0, 5);
+  const showBlocs = state.statsBloc === 'all' && ids.length > 1;
+
+  body.innerHTML = !rows.length && !openNow ? `<div class="card empty">${icon('chart')}<p>${esc(t('noDataPeriod'))}</p></div>` : `
+    <div class="kpis">
+      <div class="kpi"><span class="kpi-n">${rows.length}</span><span class="kpi-l">${esc(t('kpiObs'))}</span></div>
+      <div class="kpi"><span class="kpi-n">${openNow ?? 0}</span><span class="kpi-l">${esc(t('kpiOpenNow'))}</span></div>
+      <div class="kpi"><span class="kpi-n">${(closedRows || []).length}</span><span class="kpi-l">${esc(t('kpiClosed'))}</span></div>
+      <div class="kpi ${high ? 'kpi-warn' : ''}"><span class="kpi-n">${high}</span><span class="kpi-l">${esc(t('kpiHigh'))}</span></div>
+    </div>
+    <div class="card row" style="justify-content:space-between"><span>${icon('undo')} ${esc(t('timeToClose'))}</span><strong class="kpi-inline" dir="ltr">${fmtH(median)}</strong></div>
+    <section class="card"><h2 class="st-h">${esc(t('trend'))}</h2>${trendHtml}</section>
+    <section class="card"><h2 class="st-h">${esc(t('category'))}</h2>${hbars(count('category'), (k) => `${icon(catIcon(k))}${esc(catLabel(k))}`)}</section>
+    <section class="card"><h2 class="st-h">${esc(t('severity'))}</h2>${hbars(bySev, (k) => `<span class="badge sev-${k}">${esc(sevLetter(k))}</span> ${esc(sevLabel(k))}`, { cls: (k) => 'sevfill-' + k })}</section>
+    <section class="card"><h2 class="st-h">${esc(t('topAreas'))}</h2>${hbars(areas, (k) => esc(k))}</section>
+    ${showBlocs ? `<section class="card"><h2 class="st-h">${esc(t('byBloc'))}</h2>${hbars(count('bloc_id'), (k) => esc(blocName(k)))}</section>` : ''}
+    ${isAdmin() ? `<section class="card"><h2 class="st-h">${esc(t('supActivity'))} <span class="badge">${esc(t('admin'))}</span></h2>${hbars(count('supervisor_id'), (k) => esc(person(k)))}</section>` : ''}`;
+}
 
 // ───────── New observation ─────────
 function renderNew() {
