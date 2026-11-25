@@ -70,6 +70,25 @@ const person = (id) => state.people[id]?.full_name || state.people[id]?.username
 const usernameEmail = (u) => `${u.trim().toLowerCase()}@jph.local`;
 const blocName = (id) => state.blocs.find((b) => b.id === id)?.name || '';
 
+function distanceM(a, b) {
+  const R = 6371000, r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const zoneOf = (bloc) => (bloc && bloc.geofence_m > 0 ? { lat: bloc.center_lat, lng: bloc.center_lng, r: bloc.geofence_m } : null);
+function drawZone(map, bloc) {
+  const z = zoneOf(bloc); if (!z) return null;
+  return L.circle([z.lat, z.lng], { radius: z.r, color: '#047857', weight: 2, dashArray: '6 6', fillColor: '#047857', fillOpacity: 0.06, interactive: false }).addTo(map);
+}
+// Server refusals from the geofence rule → readable messages.
+function zoneError(e) {
+  const m = String(e?.message || '');
+  if (m.startsWith('OUTSIDE_ZONE')) return t('outsideZone', { d: m.split(':')[1] || '?', b: blocName(state.blocId) });
+  if (m.startsWith('GPS_REQUIRED')) return t('gpsRequired');
+  if (m.startsWith('GPS_IMPRECISE')) return t('gpsImprecise', { a: '>100' });
+  return null;
+}
+
 function destroyMaps() {
   if (state.map) { state.map.remove(); state.map = null; }
   state.extraMaps.forEach((m) => m.remove()); state.extraMaps = [];
@@ -269,6 +288,7 @@ async function renderMap() {
   const map = (state.map = L.map('map', { zoomControl: false }).setView([bloc.center_lat, bloc.center_lng], bloc.zoom));
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   baseLayers(map);
+  drawZone(map, bloc);
   let obs = [];
   try { obs = await fetchObservations(state.blocId, state.filter); } catch (e) { fail(e); }
   if (state.map !== map) return; // navigated away meanwhile
@@ -304,7 +324,8 @@ function renderNew() {
   if (!state.blocId) { location.hash = '#/'; return; }
   const bloc = state.blocs.find((b) => b.id === state.blocId);
   const s = state.settings;
-  const draft = { blob: null, lat: null, lng: null, acc: null, category: null, severity: null };
+  const draft = { blob: null, lat: null, lng: null, acc: null, gps: null, category: null, severity: null };
+  const restricted = !isAdmin() && !!zoneOf(bloc);
   $app.innerHTML = topbar({ backTo: '#/', title: `${t('newObs')} · ${bloc.name}` }) + `<main id="main" class="page"><form id="obsForm" class="stack" novalidate>
     <div>
       <div class="photo-box" id="photoBox"><div class="photo-empty">${icon('camera')}<span>${esc(t('takePhoto'))}</span></div>
@@ -315,6 +336,7 @@ function renderNew() {
     <div class="field"><span class="lbl">${esc(t('location'))}</span>
       <div id="pickmap" dir="ltr" aria-label="${esc(t('tapMap'))}"></div>
       <p class="gps" id="gps" role="status" style="margin-top:8px">${esc(t('locating'))}</p>
+      <p class="err small" id="err-gps"></p>
     </div>
     <label class="field"><span class="lbl">${esc(t('area'))}</span>
       <input class="input" name="area" list="areas" autocomplete="off" placeholder="${esc(t('areaHint'))}"><datalist id="areas"></datalist>
@@ -336,6 +358,10 @@ function renderNew() {
   document.getElementById('photoBtn').onclick = () => input.click();
   input.onchange = async () => {
     const f = input.files?.[0]; if (!f) return;
+    // A photo must be taken now: files older than 10 minutes (e.g. from the gallery) are refused for supervisors.
+    if (restricted && f.lastModified && Date.now() - f.lastModified > 10 * 60 * 1000) {
+      const el = document.getElementById('err-photo'); el.textContent = t('photoNotFresh'); el.style.color = 'var(--danger)'; input.value = ''; return;
+    }
     try {
       draft.blob = await compressImage(f);
       const box = document.getElementById('photoBox');
@@ -351,20 +377,33 @@ function renderNew() {
   state.extraMaps.push(map); baseLayers(map);
   let marker = null;
   const gpsEl = document.getElementById('gps');
+  drawZone(map, bloc);
+  const zoneMsg = () => {
+    const z = zoneOf(bloc); if (!z || draft.lat === null) return '';
+    const d = distanceM({ lat: draft.lat, lng: draft.lng }, z);
+    return d > z.r ? t('outsideZone', { d: Math.round(d - z.r), b: bloc.name }) : '';
+  };
   const place = (lat, lng, acc, manual) => {
-    draft.lat = lat; draft.lng = lng; draft.acc = acc;
+    if (manual && restricted) {
+      // Supervisors may only fine-tune the pin near their real GPS position.
+      if (!draft.gps) { toast(t('gpsRequired'), true); if (marker && draft.lat !== null) marker.setLatLng([draft.lat, draft.lng]); return; }
+      if (distanceM({ lat, lng }, draft.gps) > 50) { toast(t('tooFarFromGps'), true); marker?.setLatLng([draft.lat, draft.lng]); return; }
+    }
+    if (!manual) draft.gps = { lat, lng, acc };
+    draft.lat = lat; draft.lng = lng; draft.acc = manual ? (draft.gps ? draft.gps.acc : null) : acc;
     if (!marker) marker = L.marker([lat, lng], { icon: pinIcon({}, true), draggable: true }).addTo(map)
       .on('dragend', () => { const p = marker.getLatLng(); place(p.lat, p.lng, null, true); });
     else marker.setLatLng([lat, lng]);
     if (!manual) map.setView([lat, lng], Math.max(map.getZoom(), 18));
-    gpsEl.className = 'gps ok';
-    gpsEl.textContent = manual ? `${t('tapMap')} · \u2066${lat.toFixed(6)}, ${lng.toFixed(6)}\u2069` : t('gpsOk', { a: Math.round(acc) });
+    const out = zoneMsg();
+    gpsEl.className = out ? 'gps warn' : 'gps ok';
+    gpsEl.textContent = out || (manual ? `${t('tapMap')} · \u2066${lat.toFixed(6)}, ${lng.toFixed(6)}\u2069` : t('gpsOk', { a: Math.round(acc) }));
   };
   map.on('click', (e) => place(e.latlng.lat, e.latlng.lng, null, true));
   if ('geolocation' in navigator) {
     let best = null;
     const id = navigator.geolocation.watchPosition((p) => {
-      if (draft.acc === null && draft.lat !== null) return; // user placed manually
+      if (draft.lat !== null && (!draft.gps || draft.lat !== draft.gps.lat)) return; // user adjusted the pin
       if (!best || p.coords.accuracy < best.coords.accuracy) { best = p; place(p.coords.latitude, p.coords.longitude, p.coords.accuracy, false); }
     }, () => { if (draft.lat === null) { gpsEl.className = 'gps warn'; gpsEl.textContent = t('gpsFail'); } },
     { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
@@ -389,7 +428,13 @@ function renderNew() {
     e.preventDefault();
     const fd = new FormData(form);
     const area = String(fd.get('area') || '').trim();
-    const errs = { photo: !draft.blob && t('photoRequired'), area: !area && t('areaRequired'), cat: !draft.category && t('chooseCategory'), sev: !draft.severity && t('chooseSeverity') };
+    let gpsErr = '';
+    if (restricted) {
+      if (!draft.gps) gpsErr = t('gpsRequired');
+      else if (draft.gps.acc > 100) gpsErr = t('gpsImprecise', { a: Math.round(draft.gps.acc) });
+      else gpsErr = zoneMsg();
+    }
+    const errs = { photo: !draft.blob && t('photoRequired'), gps: gpsErr, area: !area && t('areaRequired'), cat: !draft.category && t('chooseCategory'), sev: !draft.severity && t('chooseSeverity') };
     for (const [k, v] of Object.entries(errs)) { const el = document.getElementById('err-' + k); el.textContent = v || ''; el.style.color = 'var(--danger)'; }
     form.area.setAttribute('aria-invalid', String(!area));
     const first = Object.entries(errs).find(([, v]) => v);
@@ -406,7 +451,11 @@ function renderNew() {
         });
         if (error) throw error;
         toast(t('saved')); state.filter = 'today'; location.hash = '#/';
-      } catch (err) { fail(err); }
+      } catch (err) {
+        const zm = zoneError(err);
+        if (zm) { const el = document.getElementById('err-gps'); el.textContent = zm; el.style.color = 'var(--danger)'; el.scrollIntoView({ block: 'center' }); toast(zm, true); }
+        else fail(err);
+      }
     });
   };
 }
@@ -507,11 +556,13 @@ async function adminBlocs(pane) {
   await refreshBlocs();
   const sel = state.blocs[0];
   pane.innerHTML = `<div class="stack">
-    <div class="card"><table class="table"><thead><tr><th>${esc(t('name'))}</th><th>${esc(t('active'))}</th><th></th></tr></thead><tbody>
+    <div class="card"><table class="table"><thead><tr><th>${esc(t('name'))}</th><th>${esc(t('zoneRadius'))}</th><th>${esc(t('active'))}</th><th></th></tr></thead><tbody>
       ${state.blocs.map((b) => `<tr><td><input class="input" data-name="${b.id}" value="${esc(b.name)}" aria-label="${esc(t('name'))}"></td>
+        <td><input class="input" type="number" min="0" step="50" inputmode="numeric" style="width:110px" data-radius="${b.id}" value="${b.geofence_m ?? 0}" aria-label="${esc(t('zoneRadius'))} – ${esc(b.name)}"></td>
         <td><label class="check"><input type="checkbox" data-active="${b.id}" ${b.active ? 'checked' : ''}><span class="sr">${esc(t('active'))}</span></label></td>
         <td><div class="row"><button class="btn" data-save="${b.id}">${esc(t('save'))}</button><a class="btn ghost" data-drive="${esc(b.name)}" href="#" target="_blank" rel="noopener" hidden>${icon('ext')}Drive</a></div></td></tr>`).join('')}
     </tbody></table>
+    <p class="small muted" style="margin-top:8px">${esc(t('zoneHelp'))}</p>
     <form id="addBloc" class="row" style="margin-top:12px"><label class="sr" for="nb">${esc(t('name'))}</label><input id="nb" class="input grow" placeholder="Bloc 11" required><button class="btn primary">${icon('plus')}${esc(t('add'))}</button></form></div>
     <div class="card stack"><div class="row"><label class="lbl" for="centerSel" style="font-weight:600">${esc(t('bloc'))}</label>
       <select id="centerSel" class="input" style="width:auto">${state.blocs.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></div>
@@ -520,22 +571,29 @@ async function adminBlocs(pane) {
   driveLinks().then((l) => pane.querySelectorAll('[data-drive]').forEach((a) => { const u = l?.blocs?.[a.dataset.drive]; if (u) { a.href = u; a.hidden = false; a.setAttribute('aria-label', `Google Drive – ${a.dataset.drive}`); } }));
   pane.querySelectorAll('[data-save]').forEach((b) => (b.onclick = () => busy(b, async () => {
     const id = Number(b.dataset.save);
-    const { error } = await sb.from('blocs').update({ name: pane.querySelector(`[data-name="${id}"]`).value.trim(), active: pane.querySelector(`[data-active="${id}"]`).checked }).eq('id', id);
-    if (error) return fail(error); toast(t('settingsSaved'));
+    const radius = Math.max(0, Math.round(Number(pane.querySelector(`[data-radius="${id}"]`).value) || 0));
+    const { error } = await sb.from('blocs').update({ name: pane.querySelector(`[data-name="${id}"]`).value.trim(), active: pane.querySelector(`[data-active="${id}"]`).checked, geofence_m: radius }).eq('id', id);
+    if (error) return fail(error); await refreshBlocs(); showZone(); toast(t('settingsSaved'));
   })));
   pane.querySelector('#addBloc').onsubmit = async (e) => {
     e.preventDefault(); const name = pane.querySelector('#nb').value.trim(); if (!name) return;
     const { error } = await sb.from('blocs').insert({ name, center_lat: sel?.center_lat ?? 33.105, center_lng: sel?.center_lng ?? -8.637 });
     if (error) return fail(error); adminBlocs(pane);
   };
+  let zoneLayer = null;
+  function showZone() {
+    if (!map) return;
+    zoneLayer?.remove(); zoneLayer = drawZone(map, state.blocs.find((x) => x.id === Number(cs.value)));
+  }
   if (!sel) return;
-  const map = L.map('adminmap').setView([sel.center_lat, sel.center_lng], sel.zoom); state.extraMaps.push(map); baseLayers(map);
+  var map = L.map('adminmap').setView([sel.center_lat, sel.center_lng], sel.zoom); state.extraMaps.push(map); baseLayers(map);
   const cs = pane.querySelector('#centerSel');
-  cs.onchange = () => { const b = state.blocs.find((x) => x.id === Number(cs.value)); map.setView([b.center_lat, b.center_lng], b.zoom); };
+  showZone();
+  cs.onchange = () => { const b = state.blocs.find((x) => x.id === Number(cs.value)); map.setView([b.center_lat, b.center_lng], b.zoom); showZone(); };
   pane.querySelector('#setCenter').onclick = (e) => busy(e.currentTarget, async () => {
     const c = map.getCenter();
     const { error } = await sb.from('blocs').update({ center_lat: c.lat, center_lng: c.lng, zoom: map.getZoom() }).eq('id', Number(cs.value));
-    if (error) return fail(error); await refreshBlocs(); toast(t('centerSaved'));
+    if (error) return fail(error); await refreshBlocs(); showZone(); toast(t('centerSaved'));
   });
 }
 
