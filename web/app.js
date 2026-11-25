@@ -32,6 +32,13 @@ const ICONS = {
   trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
   spark: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
   locate: '<circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/>',
+  list: '<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  sliders: '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
   image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
 };
 const icon = (n) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -141,11 +148,30 @@ async function route() {
     }
   }
   if (h.startsWith('#/new')) return renderNew();
+  if (h.startsWith('#/open')) { state.filter = 'open'; return renderMap(); }
   if (h.startsWith('#/obs/')) return renderDetail(h.slice(6));
   if (h.startsWith('#/admin') && isAdmin()) return renderAdmin(h.split('/')[2] || 'blocs');
   return renderMap();
 }
 window.addEventListener('hashchange', () => route().catch(fail));
+
+// Bottom navigation bar: one tap to the main places (icons + labels, never icons alone).
+function bottomNav(active) {
+  const items = [
+    ['map', '#/', 'pin', t('map')],
+    ['open', '#/open', 'list', t('open')],
+    ['new', '#/new', 'camera', t('newShort')],
+    ...(isAdmin() ? [['admin', '#/admin', 'shield', t('admin')]] : []),
+  ];
+  return `<nav class="bottom-nav" aria-label="${esc(t('menu'))}">${items.map(([k, href, ic, lbl]) =>
+    `<a href="${href}" class="nav-item${k === 'new' ? ' nav-new' : ''}"${k === active ? ' aria-current="page"' : ''} data-nav="${k}"><span class="nav-ic">${icon(ic)}</span><span class="nav-lbl">${esc(lbl)}</span></a>`).join('')}
+    <button type="button" class="nav-item" data-nav="menu" aria-haspopup="true"><span class="nav-ic">${icon('more')}</span><span class="nav-lbl">${esc(t('menu'))}</span></button></nav>`;
+}
+function bindBottomNav() {
+  const nav = document.querySelector('.bottom-nav'); if (!nav) return;
+  nav.querySelector('[data-nav=map]').onclick = (e) => { if (location.hash === '#/' || location.hash === '') { e.preventDefault(); } state.filter = 'today'; if (location.hash === '#/' || location.hash === '') renderMap(); };
+  nav.querySelector('[data-nav=menu]').onclick = (e) => { e.stopPropagation(); document.getElementById('menuBtn')?.click(); };
+}
 
 function topbar({ backTo, title } = {}) {
   const blocSelect = !backTo && state.myBlocIds.length
@@ -236,8 +262,8 @@ async function renderMap() {
     </div>
     <section class="list" id="list" aria-busy="true"><p class="muted">…</p></section>
   </main>
-  <a class="btn primary fab" href="#/new">${icon('camera')}${esc(t('newObs'))}</a>`;
-  bindTopbar();
+  ${bottomNav(state.filter === 'open' ? 'open' : 'map')}`;
+  bindTopbar(); bindBottomNav();
   $app.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { state.filter = b.dataset.f; renderMap(); }));
 
   const map = (state.map = L.map('map', { zoomControl: false }).setView([bloc.center_lat, bloc.center_lng], bloc.zoom));
@@ -415,8 +441,8 @@ async function renderDetail(id) {
           <img id="afterPrev" class="detail-photo" alt="${esc(t('afterPhoto'))}" hidden style="margin-top:8px"></div>
         <label class="field"><span class="lbl">${esc(t('closingComment'))} <span class="muted">(${esc(t('optional'))})</span></span><textarea class="input" name="cc" rows="2"></textarea></label>
         <button class="btn primary block" type="submit">${icon('check')}${esc(t('markClosed'))}</button></form>`}
-  </main>`;
-  bindTopbar();
+  </main>${bottomNav('')}`;
+  bindTopbar(); bindBottomNav();
   if (o.status === 'closed') {
     document.getElementById('reopen').onclick = (e) => busy(e.currentTarget, async () => {
       const { error: er } = await sb.from('observations').update({ status: 'open', closed_at: null, closed_by: null }).eq('id', o.id);
@@ -453,9 +479,9 @@ async function renderDetail(id) {
 async function renderAdmin(tab) {
   const tabs = ['blocs', 'users', 'recipients', 'settings', 'reports', 'export'];
   $app.innerHTML = topbar({ backTo: '#/', title: t('admin') }) + `<main id="main" class="page wide">
-    <div class="tabs" role="tablist">${tabs.map((k) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${esc(t(k))}</button>`).join('')}</div>
-    <section id="pane" role="tabpanel"><p class="muted">…</p></section></main>`;
-  bindTopbar();
+    <div class="tabs" role="tablist">${tabs.map((k) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${icon({ blocs: 'layers', users: 'users', recipients: 'mail', settings: 'sliders', reports: 'file', export: 'download' }[k])}${esc(t(k))}</button>`).join('')}</div>
+    <section id="pane" role="tabpanel"><p class="muted">…</p></section></main>${bottomNav('admin')}`;
+  bindTopbar(); bindBottomNav();
   $app.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => (location.hash = `#/admin/${b.dataset.tab}`)));
   const pane = document.getElementById('pane');
   try { await ({ blocs: adminBlocs, users: adminUsers, recipients: adminRecipients, settings: adminSettings, reports: adminReports, export: adminExport })[tab](pane); }

@@ -40,6 +40,7 @@ const T = {
     downloadXlsx: 'Download Excel (.xlsx)', downloadCsv: 'Download CSV', exported: '{n} rows exported', noData: 'No observations match these filters.',
     exportHelp: 'Includes date, Bloc, area, category, severity, status, supervisor, GPS, comments and photo links.',
     langName: 'English',
+    newShort: 'New', menu: 'Menu',
     pins: '{n} observations', selectBloc: 'Select Bloc',
   },
   fr: {
@@ -82,6 +83,7 @@ const T = {
     downloadXlsx: 'Télécharger Excel (.xlsx)', downloadCsv: 'Télécharger CSV', exported: '{n} lignes exportées', noData: 'Aucune observation ne correspond à ces filtres.',
     exportHelp: 'Comprend date, Bloc, zone, catégorie, gravité, statut, superviseur, GPS, commentaires et liens des photos.',
     langName: 'Français',
+    newShort: 'Nouvelle', menu: 'Menu',
     pins: '{n} observations', selectBloc: 'Choisir le Bloc',
   },
   ar: {
@@ -124,6 +126,7 @@ const T = {
     downloadXlsx: 'تنزيل Excel (.xlsx)', downloadCsv: 'تنزيل CSV', exported: 'تم تصدير {n} صف', noData: 'لا توجد ملاحظات تطابق هذه المعايير.',
     exportHelp: 'يشمل التاريخ والبلوك والمنطقة والفئة والخطورة والحالة والمشرف وإحداثيات GPS والتعليقات وروابط الصور.',
     langName: 'العربية',
+    newShort: 'جديدة', menu: 'القائمة',
     pins: '{n} ملاحظة', selectBloc: 'اختر البلوك',
   },
 };
