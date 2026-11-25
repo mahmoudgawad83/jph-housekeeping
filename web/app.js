@@ -479,15 +479,29 @@ async function renderDetail(id) {
 async function renderAdmin(tab) {
   const tabs = ['blocs', 'users', 'recipients', 'settings', 'reports', 'export'];
   $app.innerHTML = topbar({ backTo: '#/', title: t('admin') }) + `<main id="main" class="page wide">
+    <div class="row" style="justify-content:flex-end;margin-bottom:8px"><a class="btn" id="driveRoot" href="#" target="_blank" rel="noopener" hidden>${icon('ext')}${esc(t('driveArchive'))}</a></div>
     <div class="tabs" role="tablist">${tabs.map((k) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${icon({ blocs: 'layers', users: 'users', recipients: 'mail', settings: 'sliders', reports: 'file', export: 'download' }[k])}${esc(t(k))}</button>`).join('')}</div>
     <section id="pane" role="tabpanel"><p class="muted">…</p></section></main>${bottomNav('admin')}`;
   bindTopbar(); bindBottomNav();
   $app.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => (location.hash = `#/admin/${b.dataset.tab}`)));
   const pane = document.getElementById('pane');
+  driveLinks().then((l) => { const a = document.getElementById('driveRoot'); if (a && l?.root) { a.href = l.root; a.hidden = false; } });
   try { await ({ blocs: adminBlocs, users: adminUsers, recipients: adminRecipients, settings: adminSettings, reports: adminReports, export: adminExport })[tab](pane); }
   catch (e) { fail(e); }
 }
 async function refreshBlocs() { const { data } = await sb.from('blocs').select('*').order('id'); state.blocs = data || []; state.myBlocIds = state.blocs.filter((b) => b.active).map((b) => b.id); }
+
+// Drive folder links written by the report engine (branding/drive.json, admin-only bucket).
+let driveLinksCache = null;
+async function driveLinks() {
+  if (driveLinksCache) return driveLinksCache;
+  try {
+    const { data, error } = await sb.storage.from('branding').download('drive.json');
+    if (error || !data) return null;
+    driveLinksCache = JSON.parse(await data.text());
+    return driveLinksCache;
+  } catch { return null; }
+}
 
 async function adminBlocs(pane) {
   await refreshBlocs();
@@ -496,13 +510,14 @@ async function adminBlocs(pane) {
     <div class="card"><table class="table"><thead><tr><th>${esc(t('name'))}</th><th>${esc(t('active'))}</th><th></th></tr></thead><tbody>
       ${state.blocs.map((b) => `<tr><td><input class="input" data-name="${b.id}" value="${esc(b.name)}" aria-label="${esc(t('name'))}"></td>
         <td><label class="check"><input type="checkbox" data-active="${b.id}" ${b.active ? 'checked' : ''}><span class="sr">${esc(t('active'))}</span></label></td>
-        <td><button class="btn" data-save="${b.id}">${esc(t('save'))}</button></td></tr>`).join('')}
+        <td><div class="row"><button class="btn" data-save="${b.id}">${esc(t('save'))}</button><a class="btn ghost" data-drive="${esc(b.name)}" href="#" target="_blank" rel="noopener" hidden>${icon('ext')}Drive</a></div></td></tr>`).join('')}
     </tbody></table>
     <form id="addBloc" class="row" style="margin-top:12px"><label class="sr" for="nb">${esc(t('name'))}</label><input id="nb" class="input grow" placeholder="Bloc 11" required><button class="btn primary">${icon('plus')}${esc(t('add'))}</button></form></div>
     <div class="card stack"><div class="row"><label class="lbl" for="centerSel" style="font-weight:600">${esc(t('bloc'))}</label>
       <select id="centerSel" class="input" style="width:auto">${state.blocs.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></div>
       <div id="adminmap" dir="ltr"></div>
       <button class="btn primary" id="setCenter">${icon('locate')}${esc(t('setCenter'))}</button></div></div>`;
+  driveLinks().then((l) => pane.querySelectorAll('[data-drive]').forEach((a) => { const u = l?.blocs?.[a.dataset.drive]; if (u) { a.href = u; a.hidden = false; a.setAttribute('aria-label', `Google Drive – ${a.dataset.drive}`); } }));
   pane.querySelectorAll('[data-save]').forEach((b) => (b.onclick = () => busy(b, async () => {
     const id = Number(b.dataset.save);
     const { error } = await sb.from('blocs').update({ name: pane.querySelector(`[data-name="${id}"]`).value.trim(), active: pane.querySelector(`[data-active="${id}"]`).checked }).eq('id', id);

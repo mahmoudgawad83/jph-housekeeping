@@ -103,6 +103,19 @@ async function archive() {
   for (const o of pending) { try { await save(o, o.temp_photo_path, 'drive_link', ''); n++; } catch (e) { log('archive failed', o.id, e.message); } }
   for (const o of closing) { try { await save(o, o.closing_temp_path, 'closing_photo_link', '_after'); n++; } catch (e) { log('archive failed', o.id, e.message); } }
   log(`Archived ${n} photo(s) to Drive`);
+  await publishDriveLinks(Object.values(blocById));
+}
+
+// Saves the Drive folder links (main folder + one per Bloc) as branding/drive.json, so the Admin page can open them.
+async function publishDriveLinks(blocNames) {
+  try {
+    const url = (id) => `https://drive.google.com/drive/folders/${id}`;
+    const links = { root: url(await folderPath([])), blocs: {}, updated: new Date().toISOString() };
+    for (const name of blocNames) links.blocs[name] = url(await folderPath([name]));
+    await sb.storage.updateBucket('branding', { public: false, allowedMimeTypes: ['image/png', 'image/jpeg', 'application/json'], fileSizeLimit: 5242880 });
+    const { error } = await sb.storage.from('branding').upload('drive.json', Buffer.from(JSON.stringify(links)), { contentType: 'application/json', upsert: true });
+    if (error) throw error;
+  } catch (e) { log('Drive links not saved:', e.message); }
 }
 
 // ───────── 2. Daily report ─────────

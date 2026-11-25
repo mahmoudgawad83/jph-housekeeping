@@ -264,7 +264,7 @@ grant execute on function public.my_bloc_ids() to authenticated;
 
 -- Private branding files (JESA logos/background) for the PDF reports. Admins upload, the report engine reads.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('branding', 'branding', false, 5242880, array['image/png','image/jpeg'])
+values ('branding', 'branding', false, 5242880, array['image/png','image/jpeg','application/json'])
 on conflict (id) do nothing;
 drop policy if exists branding_admin_read on storage.objects;
 drop policy if exists branding_admin_write on storage.objects;
