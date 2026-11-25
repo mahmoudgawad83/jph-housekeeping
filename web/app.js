@@ -99,14 +99,18 @@ async function signedUrls(paths) {
 // ───────── Session & context ─────────
 async function loadContext() {
   const uid = state.session.user.id;
-  const [{ data: profile }, { data: settings }, { data: blocs }, { data: mine }, { data: people }] = await Promise.all([
+  const [profileRes, settingsRes, blocsRes, mineRes, peopleRes] = await Promise.all([
     sb.from('profiles').select('*').eq('id', uid).single(),
     sb.from('settings').select('*').eq('id', 1).single(),
     sb.from('blocs').select('*').order('id'),
     sb.from('bloc_supervisors').select('bloc_id').eq('user_id', uid),
     sb.from('profiles').select('id, username, full_name, role, active'),
   ]);
-  if (!profile || !profile.active) { await sb.auth.signOut(); state.session = null; return; }
+  const profile = profileRes.data, settings = settingsRes.data, blocs = blocsRes.data, mine = mineRes.data, people = peopleRes.data;
+  const firstErr = [profileRes, settingsRes, blocsRes, mineRes, peopleRes].find((r) => r.error)?.error;
+  if (firstErr) throw new Error(`${firstErr.message}${firstErr.code ? ` (${firstErr.code})` : ''}`);
+  if (!profile) throw new Error('No profile found for this login. Re-create the user with admin_create_user.');
+  if (!profile.active) throw new Error('This account is disabled.');
   state.profile = profile;
   state.settings = settings;
   state.blocs = blocs || [];
@@ -124,7 +128,16 @@ async function route() {
   destroyMaps();
   const h = location.hash || '#/';
   if (!state.session) return renderLogin();
-  if (!state.profile) { await loadContext(); if (!state.session) return renderLogin(); }
+  if (!state.profile) {
+    try { await loadContext(); }
+    catch (e) {
+      console.error(e);
+      state.loginError = t('error', { m: e.message });
+      state.session = null; state.profile = null;
+      await sb.auth.signOut().catch(() => {});
+      return renderLogin();
+    }
+  }
   if (h.startsWith('#/new')) return renderNew();
   if (h.startsWith('#/obs/')) return renderDetail(h.slice(6));
   if (h.startsWith('#/admin') && isAdmin()) return renderAdmin(h.split('/')[2] || 'blocs');
@@ -177,11 +190,12 @@ function renderLogin() {
     <button class="btn ghost block" type="button" id="langBtn">${icon('lang')}${esc(t('language'))}</button>
   </form></main>`;
   document.getElementById('langBtn').onclick = () => { setLang(getLang() === 'fr' ? 'en' : 'fr'); renderLogin(); };
+  if (state.loginError) document.getElementById('loginErr').textContent = state.loginError;
   const form = document.getElementById('loginForm');
   form.onsubmit = async (e) => {
     e.preventDefault();
     const fd = new FormData(form), btn = form.querySelector('[type=submit]');
-    const err = document.getElementById('loginErr'); err.textContent = '';
+    const err = document.getElementById('loginErr'); err.textContent = ''; state.loginError = '';
     await busy(btn, async () => {
       const { data, error } = await sb.auth.signInWithPassword({ email: usernameEmail(fd.get('username')), password: fd.get('password') });
       if (error) {
@@ -189,7 +203,8 @@ function renderLogin() {
         return;
       }
       state.session = data.session; state.profile = null;
-      location.hash = '#/'; await route();
+      if (location.hash && location.hash !== '#/') history.replaceState(null, '', '#/');
+      await route();
     });
   };
 }

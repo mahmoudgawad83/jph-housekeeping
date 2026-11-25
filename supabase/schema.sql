@@ -249,6 +249,14 @@ create policy photos_read on storage.objects for select to authenticated
 create policy photos_write on storage.objects for insert to authenticated
   with check (bucket_id = 'photos' and ((storage.foldername(name))[1])::int in (select public.my_bloc_ids()));
 
+-- Table access for signed-in users (rows are still filtered by the policies above).
+-- Needed on newer Supabase projects, where tables created in SQL are not exposed automatically.
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+grant execute on function public.is_admin() to authenticated;
+grant execute on function public.my_bloc_ids() to authenticated;
+
 -- Grants for the RPCs
 revoke execute on function public.admin_create_user(text,text,text,text) from public, anon;
 revoke execute on function public.admin_set_password(uuid,text) from public, anon;
