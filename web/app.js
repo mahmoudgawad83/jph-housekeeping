@@ -75,10 +75,33 @@ function distanceM(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
-const zoneOf = (bloc) => (bloc && bloc.geofence_m > 0 ? { lat: bloc.center_lat, lng: bloc.center_lng, r: bloc.geofence_m } : null);
+const ZONE_TOLERANCE_M = 25; // same margin as the database rule
+// A Bloc's zone: a drawn outline (3+ points) if any, else a circle around the centre, else none.
+function zoneOf(bloc) {
+  if (!bloc) return null;
+  if (Array.isArray(bloc.zone) && bloc.zone.length >= 3) return { poly: bloc.zone };
+  return bloc.geofence_m > 0 ? { lat: bloc.center_lat, lng: bloc.center_lng, r: bloc.geofence_m } : null;
+}
+// Metres outside the zone (0 = inside).
+function outsideBy(z, p) {
+  if (!z) return 0;
+  if (!z.poly) return Math.max(0, distanceM(p, z) - z.r);
+  const kx = 111320 * Math.cos((p.lat * Math.PI) / 180), ky = 110540, px = p.lng * kx, py = p.lat * ky;
+  let inside = false, best = Infinity;
+  for (let i = 0, j = z.poly.length - 1; i < z.poly.length; j = i++) {
+    const [ya, xa] = z.poly[i], [yb, xb] = z.poly[j];
+    if ((ya > p.lat) !== (yb > p.lat) && p.lng < ((xb - xa) * (p.lat - ya)) / (yb - ya) + xa) inside = !inside;
+    const ax = xa * kx, ay = ya * ky, dx = xb * kx - ax, dy = yb * ky - ay;
+    const t = dx || dy ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy))) : 0;
+    best = Math.min(best, Math.hypot(px - (ax + t * dx), py - (ay + t * dy)));
+  }
+  if (inside) return 0;
+  return best > ZONE_TOLERANCE_M ? best : 0;
+}
+const ZONE_STYLE = { color: '#047857', weight: 2, dashArray: '6 6', fillColor: '#047857', fillOpacity: 0.06, interactive: false };
 function drawZone(map, bloc) {
   const z = zoneOf(bloc); if (!z) return null;
-  return L.circle([z.lat, z.lng], { radius: z.r, color: '#047857', weight: 2, dashArray: '6 6', fillColor: '#047857', fillOpacity: 0.06, interactive: false }).addTo(map);
+  return (z.poly ? L.polygon(z.poly, ZONE_STYLE) : L.circle([z.lat, z.lng], { radius: z.r, ...ZONE_STYLE })).addTo(map);
 }
 // Server refusals from the geofence rule → readable messages.
 function zoneError(e) {
@@ -380,8 +403,8 @@ function renderNew() {
   drawZone(map, bloc);
   const zoneMsg = () => {
     const z = zoneOf(bloc); if (!z || draft.lat === null) return '';
-    const d = distanceM({ lat: draft.lat, lng: draft.lng }, z);
-    return d > z.r ? t('outsideZone', { d: Math.round(d - z.r), b: bloc.name }) : '';
+    const d = outsideBy(z, { lat: draft.lat, lng: draft.lng });
+    return d > 0 ? t('outsideZone', { d: Math.round(d), b: bloc.name }) : '';
   };
   const place = (lat, lng, acc, manual) => {
     if (manual && restricted) {
@@ -567,7 +590,16 @@ async function adminBlocs(pane) {
     <div class="card stack"><div class="row"><label class="lbl" for="centerSel" style="font-weight:600">${esc(t('bloc'))}</label>
       <select id="centerSel" class="input" style="width:auto">${state.blocs.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></div>
       <div id="adminmap" dir="ltr"></div>
-      <button class="btn primary" id="setCenter">${icon('locate')}${esc(t('setCenter'))}</button></div></div>`;
+      <div class="row" style="flex-wrap:wrap"><button class="btn primary" id="setCenter">${icon('locate')}${esc(t('setCenter'))}</button></div>
+      <div class="zone-tools stack" style="border-top:1px solid var(--border);padding-top:12px">
+        <p class="small muted" id="zoneInfo"></p>
+        <div class="row" style="flex-wrap:wrap">
+          <button class="btn" id="zoneDraw">${icon('pin')}${esc(t('drawZone'))}</button>
+          <button class="btn" id="zoneUndo" hidden>${icon('undo')}${esc(t('undoPoint'))}</button>
+          <button class="btn primary" id="zoneSave" hidden>${icon('check')}${esc(t('saveZone'))}</button>
+          <button class="btn danger" id="zoneClear">${icon('trash')}${esc(t('clearZone'))}</button>
+        </div>
+      </div></div></div>`;
   driveLinks().then((l) => pane.querySelectorAll('[data-drive]').forEach((a) => { const u = l?.blocs?.[a.dataset.drive]; if (u) { a.href = u; a.hidden = false; a.setAttribute('aria-label', `Google Drive – ${a.dataset.drive}`); } }));
   pane.querySelectorAll('[data-save]').forEach((b) => (b.onclick = () => busy(b, async () => {
     const id = Number(b.dataset.save);
@@ -589,7 +621,55 @@ async function adminBlocs(pane) {
   var map = L.map('adminmap').setView([sel.center_lat, sel.center_lng], sel.zoom); state.extraMaps.push(map); baseLayers(map);
   const cs = pane.querySelector('#centerSel');
   showZone();
-  cs.onchange = () => { const b = state.blocs.find((x) => x.id === Number(cs.value)); map.setView([b.center_lat, b.center_lng], b.zoom); showZone(); };
+  cs.onchange = () => { stopDrawing(); const b = state.blocs.find((x) => x.id === Number(cs.value)); map.setView([b.center_lat, b.center_lng], b.zoom); showZone(); zoneInfo(); };
+
+  // Draw the Bloc outline by tapping its corners.
+  let drawing = false, pts = [], sketch = null;
+  const $ = (id) => pane.querySelector('#' + id);
+  const curBloc = () => state.blocs.find((x) => x.id === Number(cs.value));
+  function zoneInfo() {
+    const b = curBloc(), z = zoneOf(b);
+    $('zoneInfo').textContent = drawing ? t('drawHelp', { n: pts.length })
+      : z?.poly ? t('zoneDrawn', { n: z.poly.length }) : z ? t('zoneCircle', { r: z.r }) : t('zoneNone');
+    $('zoneClear').hidden = drawing || !(z?.poly);
+  }
+  function redraw() {
+    sketch?.remove();
+    sketch = pts.length >= 3 ? L.polygon(pts, { ...ZONE_STYLE, dashArray: null, color: '#C2410C', fillColor: '#C2410C' }).addTo(map)
+      : L.polyline(pts, { color: '#C2410C', weight: 2 }).addTo(map);
+    pts.forEach((p) => { const m = L.circleMarker(p, { radius: 6, color: '#C2410C', fillColor: '#fff', fillOpacity: 1, weight: 2, interactive: false }).addTo(map); m._jphPt = true; });
+    zoneInfo();
+  }
+  function clearPoints() { map.eachLayer((l) => { if (l._jphPt) l.remove(); }); }
+  function stopDrawing() {
+    drawing = false; pts = []; clearPoints(); sketch?.remove(); sketch = null;
+    $('zoneDraw').hidden = false; $('zoneUndo').hidden = true; $('zoneSave').hidden = true; map.getContainer().style.cursor = '';
+  }
+  map.on('click', (e) => { if (!drawing) return; pts.push([+e.latlng.lat.toFixed(6), +e.latlng.lng.toFixed(6)]); clearPoints(); redraw(); });
+  $('zoneDraw').onclick = () => {
+    drawing = true; pts = []; zoneLayer?.remove(); $('zoneDraw').hidden = true; $('zoneUndo').hidden = false; $('zoneSave').hidden = false;
+    map.getContainer().style.cursor = 'crosshair'; zoneInfo();
+  };
+  $('zoneUndo').onclick = () => { pts.pop(); clearPoints(); redraw(); };
+  $('zoneSave').onclick = (e) => {
+    if (pts.length < 3) { toast(t('zoneNeed3'), true); return; }
+    busy(e.currentTarget, async () => {
+      const zone = pts.slice();
+      // Centre the Bloc on its zone so the supervisors' map opens on it.
+      const lat = zone.reduce((s, p) => s + p[0], 0) / zone.length, lng = zone.reduce((s, p) => s + p[1], 0) / zone.length;
+      const { error } = await sb.from('blocs').update({ zone, center_lat: lat, center_lng: lng, zoom: map.getZoom() }).eq('id', Number(cs.value));
+      if (error) return fail(error);
+      stopDrawing(); await refreshBlocs(); showZone(); zoneInfo(); toast(t('zoneSaved'));
+    });
+  };
+  $('zoneClear').onclick = (e) => {
+    if (!confirm(t('confirmRemove'))) return;
+    busy(e.currentTarget, async () => {
+      const { error } = await sb.from('blocs').update({ zone: null }).eq('id', Number(cs.value));
+      if (error) return fail(error); await refreshBlocs(); showZone(); zoneInfo(); toast(t('zoneSaved'));
+    });
+  };
+  zoneInfo();
   pane.querySelector('#setCenter').onclick = (e) => busy(e.currentTarget, async () => {
     const c = map.getCenter();
     const { error } = await sb.from('blocs').update({ center_lat: c.lat, center_lng: c.lng, zoom: map.getZoom() }).eq('id', Number(cs.value));

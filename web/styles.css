@@ -27,6 +27,7 @@
   --safe-t: env(safe-area-inset-top, 0px);
 }
 *, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
 body {
   font: 400 16px/1.5 Inter, "Noto Sans Arabic", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -187,7 +188,7 @@ textarea.input { min-height: 96px; resize: vertical; }
 @media (min-width: 640px) { .form-grid.two { grid-template-columns: 1fr 1fr; } }
 .check { display: inline-flex; align-items: center; gap: var(--s2); min-height: 44px; }
 .check input { width: 22px; height: 22px; accent-color: var(--primary); }
-#adminmap { height: 300px; border-radius: var(--r-md); border: 1px solid var(--border); }
+#adminmap { height: 440px; border-radius: var(--r-md); border: 1px solid var(--border); }
 
 /* ─── Toast & banner ─── */
 #toast { position: fixed; z-index: 1200; left: 50%; bottom: calc(88px + var(--safe-b)); transform: translateX(-50%); display: grid; gap: var(--s2); width: min(92vw, 420px); }
