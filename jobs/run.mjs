@@ -54,8 +54,9 @@ async function download(path) {
   return Buffer.from(await data.arrayBuffer());
 }
 async function alreadySent(blocId, type, period) {
-  const { data } = await sb.from('reports').select('id').eq('bloc_id', blocId).eq('type', type).eq('period', period).maybeSingle();
-  return Boolean(data);
+  // A failed or not-yet-configured send does not count: the next hourly run tries again.
+  const { data } = await sb.from('reports').select('id, status').eq('bloc_id', blocId).eq('type', type).eq('period', period).maybeSingle();
+  return Boolean(data) && !['error', 'email_not_configured'].includes(data.status);
 }
 async function record(row) {
   if (DRY) return;
