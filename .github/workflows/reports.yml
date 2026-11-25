@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: 'Send a report now (leave empty for a normal run)'
+        description: 'Send a report now (normal = usual hourly checks)'
         type: choice
-        options: ['', daily, weekly]
-        default: ''
+        options: [normal, daily, weekly]
+        default: normal
       bloc:
         description: 'Only this Bloc (e.g. "Bloc 7"); empty = all'
         required: false
@@ -42,7 +42,7 @@ jobs:
           DRIVE_ROOT_FOLDER_ID: ${{ vars.DRIVE_ROOT_FOLDER_ID }}
         run: |
           ARGS=()
-          if [ -n "${{ inputs.force }}" ]; then ARGS+=(--force "${{ inputs.force }}"); fi
+          if [ -n "${{ inputs.force }}" ] && [ "${{ inputs.force }}" != "normal" ]; then ARGS+=(--force "${{ inputs.force }}"); fi
           if [ -n "${{ inputs.bloc }}" ]; then ARGS+=(--bloc "${{ inputs.bloc }}"); fi
           if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS+=(--dry-run); fi
           node run.mjs "${ARGS[@]}"
