@@ -253,6 +253,8 @@ async function cleanup() {
 const errors = [];
 const attempt = async (label, fn) => { try { await fn(); } catch (e) { errors.push(`${label}: ${e.message}`); log('ERROR', label, e.stack || e.message); } };
 
+if (args.force) await attempt('archive', archive); // a manual run also archives photos, so links are in the report
+
 if (args.force === 'daily') {
   for (const b of blocs) await attempt(`daily ${b.name}`, () => sendDaily(b, today));
 } else if (args.force === 'weekly') {
