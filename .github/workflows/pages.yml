@@ -12,11 +12,24 @@ concurrency: { group: pages, cancel-in-progress: true }
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: { name: github-pages, url: '${{ steps.deployment.outputs.page_url }}' }
+    environment: { name: github-pages, url: '${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url || steps.deployment.outputs.page_url }}' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: web }
+      # GitHub's Pages service sometimes fails with "Fetching artifact metadata failed"; wait and retry twice.
+      - id: deploy1
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - if: steps.deploy1.outcome == 'failure'
+        run: sleep 60
+      - id: deploy2
+        if: steps.deploy1.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: sleep 120
       - id: deployment
+        if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
         uses: actions/deploy-pages@v4
