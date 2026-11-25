@@ -1,0 +1,51 @@
+name: Reports & housekeeping jobs
+# Runs every hour. The script itself decides (in Africa/Casablanca time) whether it is
+# time for the "no input" warning, the daily report, the weekly report and the clean-up.
+on:
+  schedule:
+    - cron: '5 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Send a report now (leave empty for a normal run)'
+        type: choice
+        options: ['', daily, weekly]
+        default: ''
+      bloc:
+        description: 'Only this Bloc (e.g. "Bloc 7"); empty = all'
+        required: false
+      dry_run:
+        description: 'Test only: build PDFs without sending (download them from the run page)'
+        type: boolean
+        default: false
+concurrency: { group: reports, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults: { run: { working-directory: jobs } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: jobs/package-lock.json }
+      - run: npm ci --no-audit --no-fund
+      - name: Run
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EMAIL_PROVIDER: ${{ vars.EMAIL_PROVIDER || 'brevo' }}
+          EMAIL_API_KEY: ${{ secrets.EMAIL_API_KEY }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          DRIVE_ROOT_FOLDER_ID: ${{ vars.DRIVE_ROOT_FOLDER_ID }}
+        run: |
+          ARGS=()
+          if [ -n "${{ inputs.force }}" ]; then ARGS+=(--force "${{ inputs.force }}"); fi
+          if [ -n "${{ inputs.bloc }}" ]; then ARGS+=(--bloc "${{ inputs.bloc }}"); fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS+=(--dry-run); fi
+          node run.mjs "${ARGS[@]}"
+      - if: ${{ inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with: { name: test-reports, path: jobs/out/*.pdf }
