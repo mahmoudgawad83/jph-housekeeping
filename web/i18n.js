@@ -36,6 +36,10 @@ const T = {
     offline: 'You are offline. Saving will work again when the connection returns.',
     error: 'Something went wrong: {m}', confirmRemove: 'Remove this item?',
     install: 'Install app', language: 'Français',
+    export: 'Export', exportTitle: 'Export observations', dateFrom: 'From', dateTo: 'To', allBlocs: 'All Blocs', allStatus: 'All',
+    downloadXlsx: 'Download Excel (.xlsx)', downloadCsv: 'Download CSV', exported: '{n} rows exported', noData: 'No observations match these filters.',
+    exportHelp: 'Includes date, Bloc, area, category, severity, status, supervisor, GPS, comments and photo links.',
+    langName: 'English',
     pins: '{n} observations', selectBloc: 'Select Bloc',
   },
   fr: {
@@ -74,20 +78,71 @@ const T = {
     offline: 'Vous êtes hors ligne. L’enregistrement fonctionnera au retour de la connexion.',
     error: 'Une erreur est survenue : {m}', confirmRemove: 'Supprimer cet élément ?',
     install: "Installer l'application", language: 'English',
+    export: 'Export', exportTitle: 'Exporter les observations', dateFrom: 'Du', dateTo: 'Au', allBlocs: 'Tous les Blocs', allStatus: 'Tous',
+    downloadXlsx: 'Télécharger Excel (.xlsx)', downloadCsv: 'Télécharger CSV', exported: '{n} lignes exportées', noData: 'Aucune observation ne correspond à ces filtres.',
+    exportHelp: 'Comprend date, Bloc, zone, catégorie, gravité, statut, superviseur, GPS, commentaires et liens des photos.',
+    langName: 'Français',
     pins: '{n} observations', selectBloc: 'Choisir le Bloc',
+  },
+  ar: {
+    appName: 'JPH Housekeeping',
+    signIn: 'تسجيل الدخول', username: 'اسم المستخدم', password: 'كلمة المرور',
+    signInHelp: 'استخدم اسم المستخدم وكلمة المرور اللذين قدمهما لك المسؤول.',
+    badLogin: 'اسم المستخدم أو كلمة المرور غير صحيحة.',
+    signOut: 'تسجيل الخروج', admin: 'الإدارة', map: 'الخريطة',
+    today: 'اليوم', open: 'مفتوحة', last7: 'آخر 7 أيام',
+    newObs: 'ملاحظة جديدة', takePhoto: 'التقاط صورة', retake: 'إعادة التقاط الصورة',
+    location: 'الموقع', locating: 'جارٍ تحديد موقع GPS…', gpsOk: 'تم تحديد الموقع (±{a} م)',
+    gpsFail: 'GPS غير متاح. المس الخريطة لوضع العلامة.', tapMap: 'المس الخريطة لتعديل العلامة',
+    area: 'المنطقة', areaHint: 'مثال: الناقل C3، البوابة 2، مخزن التخزين',
+    category: 'الفئة', severity: 'الخطورة', comment: 'تعليق', optional: 'اختياري',
+    save: 'حفظ', saving: 'جارٍ الحفظ…', cancel: 'إلغاء', back: 'رجوع', close: 'إغلاق',
+    saved: 'تم حفظ الملاحظة', photoRequired: 'يرجى التقاط صورة أولاً.',
+    areaRequired: 'يرجى إدخال المنطقة.', chooseCategory: 'اختر فئة.', chooseSeverity: 'اختر درجة الخطورة.',
+    noObs: 'لا توجد ملاحظات في هذا العرض.', status: 'الحالة',
+    statusOpen: 'مفتوحة', statusClosed: 'مغلقة', markClosed: 'إغلاق الملاحظة', reopen: 'إعادة فتح',
+    afterPhoto: 'صورة بعد المعالجة', closingComment: 'تعليق الإغلاق',
+    closedOk: 'تم إغلاق الملاحظة', reopenedOk: 'تمت إعادة فتح الملاحظة',
+    by: 'بواسطة', at: 'في', time: 'الوقت', coords: 'الإحداثيات', openInDrive: 'فتح في Google Drive',
+    noBlocs: 'لم يتم تعيينك لأي بلوك بعد. تواصل مع المسؤول.',
+    bloc: 'البلوك', blocs: 'البلوكات', users: 'المستخدمون', recipients: 'المستلمون', settings: 'الإعدادات', reports: 'التقارير',
+    add: 'إضافة', edit: 'تعديل', remove: 'حذف', name: 'الاسم', email: 'البريد الإلكتروني', role: 'الدور', active: 'نشط',
+    fullName: 'الاسم الكامل', supervisor: 'مشرف', administrator: 'مسؤول',
+    daily: 'يومي', weekly: 'أسبوعي', assignedBlocs: 'البلوكات المعيّنة', newPassword: 'كلمة مرور جديدة',
+    setPassword: 'تعيين كلمة المرور', passwordSet: 'تم تحديث كلمة المرور', userCreated: 'تم إنشاء المستخدم',
+    setCenter: 'استخدام العرض الحالي كمركز للبلوك', centerSaved: 'تم حفظ مركز البلوك',
+    dailyTime: 'وقت التقرير اليومي', weeklyDay: 'يوم التقرير الأسبوعي', weeklyTime: 'وقت التقرير الأسبوعي',
+    noInputTime: 'تنبيه إذا لم تُسجَّل ملاحظات قبل', alertEmails: 'مستلمو التنبيهات (مفصولة بفواصل)',
+    senderName: 'اسم المرسل', reportLanguage: 'لغة التقارير', both: 'الفرنسية + الإنجليزية',
+    saveSettings: 'حفظ الإعدادات', settingsSaved: 'تم حفظ الإعدادات',
+    days: ['الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'],
+    period: 'الفترة', type: 'النوع', sentAt: 'أُرسل', none: 'لا شيء حتى الآن',
+    offline: 'أنت غير متصل. سيعمل الحفظ عند عودة الاتصال.',
+    error: 'حدث خطأ: {m}', confirmRemove: 'هل تريد حذف هذا العنصر؟',
+    install: 'تثبيت التطبيق', language: 'اللغة',
+    export: 'تصدير', exportTitle: 'تصدير الملاحظات', dateFrom: 'من', dateTo: 'إلى', allBlocs: 'كل البلوكات', allStatus: 'الكل',
+    downloadXlsx: 'تنزيل Excel (.xlsx)', downloadCsv: 'تنزيل CSV', exported: 'تم تصدير {n} صف', noData: 'لا توجد ملاحظات تطابق هذه المعايير.',
+    exportHelp: 'يشمل التاريخ والبلوك والمنطقة والفئة والخطورة والحالة والمشرف وإحداثيات GPS والتعليقات وروابط الصور.',
+    langName: 'العربية',
+    pins: '{n} ملاحظة', selectBloc: 'اختر البلوك',
   },
 };
 
 let lang = 'fr';
 try {
-  lang = localStorage.getItem('lang') || ((navigator.language || '').startsWith('en') ? 'en' : 'fr');
+  const nav = navigator.language || '';
+  lang = localStorage.getItem('lang') || (nav.startsWith('ar') ? 'ar' : nav.startsWith('en') ? 'en' : 'fr');
 } catch { /* storage unavailable: keep French */ }
 
 export function getLang() { return lang; }
-export function setLang(l) { lang = l; try { localStorage.setItem('lang', l); } catch { /* ignore */ } document.documentElement.lang = l; }
+export const LANGS = ['fr', 'en', 'ar'];
+export function applyDir() { document.documentElement.lang = lang; document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'; }
+export function setLang(l) { lang = LANGS.includes(l) ? l : 'fr'; try { localStorage.setItem('lang', lang); } catch { /* ignore */ } applyDir(); }
+/** Locale for dates and numbers (Moroccan Arabic keeps Western digits). */
+export const locale = () => (lang === 'ar' ? 'ar-MA' : lang);
 export function t(key, vars = {}) {
   let s = (T[lang] && T[lang][key]) ?? T.en[key] ?? key;
   if (typeof s === 'string') for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, v);
   return s;
 }
-export function label(item) { return item ? (item[lang] || item.en || item.key) : ''; }
+export function label(item) { return item ? (item[lang] || (lang === 'ar' ? item.fr : null) || item.en || item.key) : ''; }

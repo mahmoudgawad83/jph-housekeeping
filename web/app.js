@@ -1,6 +1,8 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
-import { t, label, getLang, setLang } from './i18n.js';
+import { t, label, getLang, setLang, LANGS, applyDir, locale } from './i18n.js';
+
+const LANG_NAMES = { fr: 'Français', en: 'English', ar: 'العربية' };
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 const $app = document.getElementById('app');
@@ -51,8 +53,8 @@ async function busy(btn, fn) {
 }
 const pad = (n) => String(n).padStart(2, '0');
 const localDate = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const fmtTime = (iso) => new Date(iso).toLocaleTimeString(getLang(), { hour: '2-digit', minute: '2-digit' });
-const fmtDateTime = (iso) => new Date(iso).toLocaleString(getLang(), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const fmtTime = (iso) => new Date(iso).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
+const fmtDateTime = (iso) => new Date(iso).toLocaleString(locale(), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const findItem = (list, key) => (list || []).find((x) => x.key === key) || { key, en: key, fr: key };
 const catLabel = (k) => label(findItem(state.settings?.categories, k));
 const sevLabel = (k) => label(findItem(state.settings?.severities, k));
@@ -158,7 +160,7 @@ function topbar({ backTo, title } = {}) {
       <button class="btn ghost icon-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false" aria-label="Menu">${icon('more')}</button>
       <div class="menu" id="menu" hidden>
         <div class="small muted" style="padding:8px 12px">${esc(state.profile.full_name || state.profile.username)}</div>
-        <button class="btn ghost block" data-act="lang">${icon('lang')}${esc(t('language'))}</button>
+        <div class="lang-row" role="group" aria-label="Language">${LANGS.map((l) => `<button class="btn ghost" data-lang="${l}" lang="${l}" aria-pressed="${l === getLang()}">${LANG_NAMES[l]}</button>`).join('')}</div>
         <a class="btn ghost block" href="#/" style="justify-content:flex-start;text-decoration:none">${icon('pin')}${esc(t('map'))}</a>
         ${isAdmin() ? `<a class="btn ghost block" href="#/admin" style="justify-content:flex-start;text-decoration:none">${icon('shield')}${esc(t('admin'))}</a>` : ''}
         <button class="btn ghost block" data-act="logout">${icon('logout')}${esc(t('signOut'))}</button>
@@ -170,7 +172,7 @@ function bindTopbar() {
   const btn = document.getElementById('menuBtn'), menu = document.getElementById('menu');
   btn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); };
   document.addEventListener('click', () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }, { once: true });
-  menu.querySelector('[data-act=lang]').onclick = () => { setLang(getLang() === 'fr' ? 'en' : 'fr'); route(); };
+  menu.querySelectorAll('[data-lang]').forEach((b) => (b.onclick = () => { setLang(b.dataset.lang); route(); }));
   menu.querySelector('[data-act=logout]').onclick = async () => { await sb.auth.signOut(); };
   const sel = document.getElementById('blocSel');
   if (sel) sel.onchange = () => { state.blocId = Number(sel.value); try { localStorage.setItem('bloc', sel.value); } catch { /* ignore */ } renderMap(); };
@@ -187,9 +189,9 @@ function renderLogin() {
       <input class="input" name="password" type="password" autocomplete="current-password" required></label>
     <p class="err small" id="loginErr" role="alert" style="color:var(--danger)"></p>
     <button class="btn primary block" type="submit">${esc(t('signIn'))}</button>
-    <button class="btn ghost block" type="button" id="langBtn">${icon('lang')}${esc(t('language'))}</button>
+    <div class="lang-row" role="group" aria-label="Language">${LANGS.map((l) => `<button class="btn ghost" type="button" data-lang="${l}" lang="${l}" aria-pressed="${l === getLang()}">${LANG_NAMES[l]}</button>`).join('')}</div>
   </form></main>`;
-  document.getElementById('langBtn').onclick = () => { setLang(getLang() === 'fr' ? 'en' : 'fr'); renderLogin(); };
+  $app.querySelectorAll('[data-lang]').forEach((b) => (b.onclick = () => { setLang(b.dataset.lang); renderLogin(); }));
   if (state.loginError) document.getElementById('loginErr').textContent = state.loginError;
   const form = document.getElementById('loginForm');
   form.onsubmit = async (e) => {
@@ -229,7 +231,7 @@ async function renderMap() {
   const bloc = state.blocs.find((b) => b.id === state.blocId);
   const filters = [['today', t('today')], ['open', t('open')], ['last7', t('last7')]];
   $app.innerHTML = topbar() + `<main id="main" class="map-layout">
-    <div class="map-wrap"><div id="map" role="region" aria-label="${esc(t('map'))}"></div>
+    <div class="map-wrap"><div id="map" dir="ltr" role="region" aria-label="${esc(t('map'))}"></div>
       <div class="map-overlay"><div class="seg" role="group">${filters.map(([k, l]) => `<button data-f="${k}" aria-pressed="${state.filter === k}">${esc(l)}</button>`).join('')}</div></div>
     </div>
     <section class="list" id="list" aria-busy="true"><p class="muted">…</p></section>
@@ -285,7 +287,7 @@ function renderNew() {
       <p class="err small" id="err-photo" style="color:var(--danger)"></p>
     </div>
     <div class="field"><span class="lbl">${esc(t('location'))}</span>
-      <div id="pickmap" aria-label="${esc(t('tapMap'))}"></div>
+      <div id="pickmap" dir="ltr" aria-label="${esc(t('tapMap'))}"></div>
       <p class="gps" id="gps" role="status" style="margin-top:8px">${esc(t('locating'))}</p>
     </div>
     <label class="field"><span class="lbl">${esc(t('area'))}</span>
@@ -330,7 +332,7 @@ function renderNew() {
     else marker.setLatLng([lat, lng]);
     if (!manual) map.setView([lat, lng], Math.max(map.getZoom(), 18));
     gpsEl.className = 'gps ok';
-    gpsEl.textContent = manual ? `${t('tapMap')} · ${lat.toFixed(6)}, ${lng.toFixed(6)}` : t('gpsOk', { a: Math.round(acc) });
+    gpsEl.textContent = manual ? `${t('tapMap')} · \u2066${lat.toFixed(6)}, ${lng.toFixed(6)}\u2069` : t('gpsOk', { a: Math.round(acc) });
   };
   map.on('click', (e) => place(e.latlng.lat, e.latlng.lng, null, true));
   if ('geolocation' in navigator) {
@@ -397,8 +399,8 @@ async function renderDetail(id) {
       <dt>${esc(t('bloc'))}</dt><dd>${esc(blocName(o.bloc_id))}</dd>
       <dt>${esc(t('area'))}</dt><dd>${esc(o.area)}</dd>
       <dt>${esc(t('supervisor'))}</dt><dd>${esc(person(o.supervisor_id))}</dd>
-      <dt>${esc(t('time'))}</dt><dd>${esc(new Date(o.created_at).toLocaleString(getLang()))}</dd>
-      <dt>${esc(t('coords'))}</dt><dd>${maps ? `<a href="${maps}" target="_blank" rel="noopener">${o.lat.toFixed(6)}, ${o.lng.toFixed(6)}</a>${o.gps_accuracy ? ` <span class="muted">(±${Math.round(o.gps_accuracy)} m)</span>` : ''}` : '—'}</dd>
+      <dt>${esc(t('time'))}</dt><dd>${esc(new Date(o.created_at).toLocaleString(locale()))}</dd>
+      <dt>${esc(t('coords'))}</dt><dd><span dir="ltr">${maps ? `<a href="${maps}" target="_blank" rel="noopener">${o.lat.toFixed(6)}, ${o.lng.toFixed(6)}</a>${o.gps_accuracy ? ` <span class="muted">(±${Math.round(o.gps_accuracy)} m)</span>` : ''}` : '—'}</span></dd>
       ${o.comment ? `<dt>${esc(t('comment'))}</dt><dd>${esc(o.comment)}</dd>` : ''}
       ${o.drive_link && photo ? `<dt>Drive</dt><dd><a href="${esc(o.drive_link)}" target="_blank" rel="noopener">${esc(t('openInDrive'))}</a></dd>` : ''}
     </dl></div>
@@ -449,14 +451,14 @@ async function renderDetail(id) {
 
 // ───────── Admin ─────────
 async function renderAdmin(tab) {
-  const tabs = ['blocs', 'users', 'recipients', 'settings', 'reports'];
+  const tabs = ['blocs', 'users', 'recipients', 'settings', 'reports', 'export'];
   $app.innerHTML = topbar({ backTo: '#/', title: t('admin') }) + `<main id="main" class="page wide">
     <div class="tabs" role="tablist">${tabs.map((k) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${esc(t(k))}</button>`).join('')}</div>
     <section id="pane" role="tabpanel"><p class="muted">…</p></section></main>`;
   bindTopbar();
   $app.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => (location.hash = `#/admin/${b.dataset.tab}`)));
   const pane = document.getElementById('pane');
-  try { await ({ blocs: adminBlocs, users: adminUsers, recipients: adminRecipients, settings: adminSettings, reports: adminReports })[tab](pane); }
+  try { await ({ blocs: adminBlocs, users: adminUsers, recipients: adminRecipients, settings: adminSettings, reports: adminReports, export: adminExport })[tab](pane); }
   catch (e) { fail(e); }
 }
 async function refreshBlocs() { const { data } = await sb.from('blocs').select('*').order('id'); state.blocs = data || []; state.myBlocIds = state.blocs.filter((b) => b.active).map((b) => b.id); }
@@ -473,7 +475,7 @@ async function adminBlocs(pane) {
     <form id="addBloc" class="row" style="margin-top:12px"><label class="sr" for="nb">${esc(t('name'))}</label><input id="nb" class="input grow" placeholder="Bloc 11" required><button class="btn primary">${icon('plus')}${esc(t('add'))}</button></form></div>
     <div class="card stack"><div class="row"><label class="lbl" for="centerSel" style="font-weight:600">${esc(t('bloc'))}</label>
       <select id="centerSel" class="input" style="width:auto">${state.blocs.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></div>
-      <div id="adminmap"></div>
+      <div id="adminmap" dir="ltr"></div>
       <button class="btn primary" id="setCenter">${icon('locate')}${esc(t('setCenter'))}</button></div></div>`;
   pane.querySelectorAll('[data-save]').forEach((b) => (b.onclick = () => busy(b, async () => {
     const id = Number(b.dataset.save);
@@ -598,7 +600,7 @@ async function adminRecipients(pane, blocId) {
 async function adminSettings(pane) {
   const { data: s, error } = await sb.from('settings').select('*').eq('id', 1).single();
   if (error) throw error;
-  const catsText = s.categories.map((c) => `${c.key} | ${c.en} | ${c.fr}`).join('\n');
+  const catsText = s.categories.map((c) => `${c.key} | ${c.en} | ${c.fr} | ${c.ar || ''}`).join('\n');
   pane.innerHTML = `<form class="card stack" id="setForm"><div class="form-grid two">
     <label class="field"><span class="lbl">${esc(t('dailyTime'))}</span><input class="input" type="time" name="daily_time" value="${esc(s.daily_time)}"></label>
     <label class="field"><span class="lbl">${esc(t('noInputTime'))}</span><input class="input" type="time" name="no_input_time" value="${esc(s.no_input_time)}"></label>
@@ -612,14 +614,14 @@ async function adminSettings(pane) {
     </div>
     <label class="field"><span class="lbl">${esc(t('alertEmails'))}</span><input class="input" name="alert_emails" value="${esc((s.alert_emails || []).join(', '))}"></label>
     <label class="field"><span class="lbl">${esc(t('category'))}</span><textarea class="input" name="categories" rows="9" style="font-family:ui-monospace,monospace;font-size:14px">${esc(catsText)}</textarea>
-      <span class="hint">key | English | Français</span></label>
+      <span class="hint">key | English | Français | العربية</span></label>
     <p class="small muted">${esc(t('severity'))}: ${s.severities.map((x) => esc(label(x))).join(' · ')} · Timezone: ${esc(s.timezone)}</p>
     <button class="btn primary" type="submit">${esc(t('saveSettings'))}</button></form>`;
   const f = pane.querySelector('#setForm');
   f.onsubmit = (e) => { e.preventDefault(); busy(f.querySelector('[type=submit]'), async () => {
     const fd = new FormData(f);
     const categories = String(fd.get('categories')).split('\n').map((l) => l.split('|').map((x) => x.trim())).filter((p) => p[0])
-      .map(([key, en, fr]) => ({ key: key.toLowerCase().replace(/\s+/g, '_'), en: en || key, fr: fr || en || key }));
+      .map(([key, en, fr, ar]) => ({ key: key.toLowerCase().replace(/\s+/g, '_'), en: en || key, fr: fr || en || key, ...(ar ? { ar } : {}) }));
     const patch = {
       daily_time: fd.get('daily_time'), no_input_time: fd.get('no_input_time'), weekly_day: Number(fd.get('weekly_day')), weekly_time: fd.get('weekly_time'),
       sender_name: String(fd.get('sender_name')).trim(), report_language: fd.get('report_language'),
@@ -640,6 +642,75 @@ async function adminReports(pane) {
       : `<tr><td colspan="6" class="muted">${esc(t('none'))}</td></tr>`}</tbody></table></div>`;
 }
 
+// ───────── Export (Excel / CSV) ─────────
+async function adminExport(pane) {
+  await refreshBlocs();
+  const today = localDate(), monthAgo = localDate(new Date(Date.now() - 30 * 86400000));
+  pane.innerHTML = `<form class="card stack" id="expForm"><h2>${esc(t('exportTitle'))}</h2>
+    <p class="small muted">${esc(t('exportHelp'))}</p>
+    <div class="form-grid two">
+      <label class="field"><span class="lbl">${esc(t('bloc'))}</span><select class="input" name="bloc"><option value="">${esc(t('allBlocs'))}</option>
+        ${state.blocs.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></label>
+      <label class="field"><span class="lbl">${esc(t('status'))}</span><select class="input" name="status">
+        <option value="">${esc(t('allStatus'))}</option><option value="open">${esc(t('statusOpen'))}</option><option value="closed">${esc(t('statusClosed'))}</option></select></label>
+      <label class="field"><span class="lbl">${esc(t('dateFrom'))}</span><input class="input" type="date" name="from" value="${monthAgo}" required></label>
+      <label class="field"><span class="lbl">${esc(t('dateTo'))}</span><input class="input" type="date" name="to" value="${today}" required></label>
+    </div>
+    <p class="err small" id="expMsg" role="status"></p>
+    <div class="row" style="flex-wrap:wrap"><button class="btn primary" type="submit" data-fmt="xlsx">${esc(t('downloadXlsx'))}</button>
+      <button class="btn" type="submit" data-fmt="csv">${esc(t('downloadCsv'))}</button></div></form>`;
+  const f = pane.querySelector('#expForm');
+  f.onsubmit = (e) => {
+    e.preventDefault();
+    const btn = e.submitter || f.querySelector('[data-fmt=xlsx]');
+    busy(btn, async () => {
+      const msg = pane.querySelector('#expMsg'); msg.textContent = ''; msg.style.color = 'var(--text-2)';
+      try {
+        const fd = new FormData(f);
+        const from = new Date(`${fd.get('from')}T00:00:00`), to = new Date(`${fd.get('to')}T00:00:00`); to.setDate(to.getDate() + 1);
+        const rows = [];
+        for (let start = 0; ; start += 1000) { // Supabase returns at most 1000 rows per request
+          let q = sb.from('observations').select('*').gte('created_at', from.toISOString()).lt('created_at', to.toISOString())
+            .order('created_at', { ascending: true }).range(start, start + 999);
+          if (fd.get('bloc')) q = q.eq('bloc_id', Number(fd.get('bloc')));
+          if (fd.get('status')) q = q.eq('status', fd.get('status'));
+          const { data, error } = await q; if (error) throw error;
+          rows.push(...data); if (data.length < 1000) break;
+        }
+        if (!rows.length) { msg.textContent = t('noData'); return; }
+        const fmt = (iso) => (iso ? new Date(iso) : null);
+        const pad2 = (n) => String(n).padStart(2, '0');
+        const d = (x) => (x ? `${x.getFullYear()}-${pad2(x.getMonth() + 1)}-${pad2(x.getDate())}` : '');
+        const tm = (x) => (x ? `${pad2(x.getHours())}:${pad2(x.getMinutes())}` : '');
+        const header = [t('bloc'), 'Date', t('time'), t('area'), t('category'), t('severity'), t('status'), t('supervisor'),
+          'Latitude', 'Longitude', 'GPS ± m', t('comment'), `${t('statusClosed')} – Date`, `${t('statusClosed')} – ${t('by')}`, t('closingComment'), 'Photo (Drive)', `${t('afterPhoto')} (Drive)`, 'ID'];
+        const data = rows.map((o) => { const c = fmt(o.created_at), cl = fmt(o.closed_at); return [
+          blocName(o.bloc_id), d(c), tm(c), o.area, catLabel(o.category), sevLabel(o.severity), o.status === 'closed' ? t('statusClosed') : t('statusOpen'),
+          person(o.supervisor_id), o.lat ?? '', o.lng ?? '', o.gps_accuracy != null ? Math.round(o.gps_accuracy) : '', o.comment,
+          cl ? `${d(cl)} ${tm(cl)}` : '', o.closed_by ? person(o.closed_by) : '', o.closing_comment || '', o.drive_link || '', o.closing_photo_link || '', o.id]; });
+        const base = `JPH_Housekeeping_${fd.get('bloc') ? blocName(Number(fd.get('bloc'))).replace(/\s+/g, '_') : 'all'}_${fd.get('from')}_${fd.get('to')}`;
+        if (btn.dataset.fmt === 'csv') {
+          const cell = (v) => { const x = String(v ?? ''); return /[",;\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x; };
+          const csv = '\ufeff' + [header, ...data].map((r) => r.map(cell).join(';')).join('\r\n'); // BOM + ';' so Excel opens accents and Arabic correctly
+          saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `${base}.csv`);
+        } else {
+          const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+          const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+          ws['!cols'] = header.map((h, i) => ({ wch: [10, 11, 7, 22, 16, 11, 10, 20, 11, 11, 8, 40, 17, 18, 30, 30, 30, 10][i] || 14 }));
+          ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: data.length, c: header.length - 1 } }) };
+          const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Observations');
+          saveBlob(new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `${base}.xlsx`);
+        }
+        msg.textContent = t('exported', { n: rows.length });
+      } catch (err) { fail(err); }
+    });
+  };
+}
+function saveBlob(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
 // ───────── Boot ─────────
 window.addEventListener('online', () => route());
 window.addEventListener('offline', () => route());
@@ -648,7 +719,7 @@ sb.auth.onAuthStateChange((event, session) => {
   else if (session) state.session = session;
 });
 (async () => {
-  document.documentElement.lang = getLang();
+  applyDir();
   const { data } = await sb.auth.getSession();
   state.session = data.session;
   await route();

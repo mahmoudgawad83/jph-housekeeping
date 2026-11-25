@@ -63,3 +63,5 @@ Build and deploy it end to end: create the repo, push code, set up hosting, data
 - Design system: `design-system/MASTER.md` (from the ui-ux-pro-max skill data).
 - Layout: `web/` = PWA front end (GitHub Pages), `supabase/` = SQL, `jobs/` = report engine, `docs/SETUP.md` = setup guide.
 - PDF reports use the JESA corporate style (navy #253C8D, blues, wave header, logos). The logo/background files live in the private Supabase bucket `branding` (jesa-logo.png, jesa-logo-small.png, jesagroup-com.png, bg-cover.jpg), not in this public repo; without them the report falls back to text "JESA".
+- App interface languages: French, English, Arabic (right-to-left). Reports stay French/English. Categories and severities carry `ar` labels in `settings`.
+- Admin › Export: observations for a Bloc/date range/status as Excel (.xlsx, via SheetJS from jsDelivr) or CSV (UTF-8 with BOM, `;` separated).

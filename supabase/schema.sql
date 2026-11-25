@@ -93,20 +93,20 @@ create table if not exists public.settings (
   hotspot_days int not null default 7,
   hotspot_min int not null default 3,
   categories jsonb not null default '[
-    {"key":"spillage","en":"Spillage","fr":"Déversement"},
-    {"key":"waste","en":"Waste","fr":"Déchets"},
-    {"key":"obstruction","en":"Obstruction","fr":"Obstruction"},
-    {"key":"leak","en":"Leak","fr":"Fuite"},
-    {"key":"dust","en":"Dust","fr":"Poussière"},
-    {"key":"equipment_left","en":"Equipment left","fr":"Matériel abandonné"},
-    {"key":"cleanliness_ok","en":"Cleanliness OK","fr":"Propreté OK"},
-    {"key":"other","en":"Other","fr":"Autre"}
+    {"key":"spillage","en":"Spillage","fr":"Déversement","ar":"انسكاب"},
+    {"key":"waste","en":"Waste","fr":"Déchets","ar":"نفايات"},
+    {"key":"obstruction","en":"Obstruction","fr":"Obstruction","ar":"عائق"},
+    {"key":"leak","en":"Leak","fr":"Fuite","ar":"تسرّب"},
+    {"key":"dust","en":"Dust","fr":"Poussière","ar":"غبار"},
+    {"key":"equipment_left","en":"Equipment left","fr":"Matériel abandonné","ar":"معدات متروكة"},
+    {"key":"cleanliness_ok","en":"Cleanliness OK","fr":"Propreté OK","ar":"النظافة جيدة"},
+    {"key":"other","en":"Other","fr":"Autre","ar":"أخرى"}
   ]'::jsonb,
   severities jsonb not null default '[
-    {"key":"low","en":"Low","fr":"Faible"},
-    {"key":"medium","en":"Medium","fr":"Moyenne"},
-    {"key":"high","en":"High","fr":"Élevée"},
-    {"key":"critical","en":"Critical","fr":"Critique"}
+    {"key":"low","en":"Low","fr":"Faible","ar":"منخفضة"},
+    {"key":"medium","en":"Medium","fr":"Moyenne","ar":"متوسطة"},
+    {"key":"high","en":"High","fr":"Élevée","ar":"مرتفعة"},
+    {"key":"critical","en":"Critical","fr":"Critique","ar":"حرجة"}
   ]'::jsonb
 );
 insert into public.settings (id) values (1) on conflict do nothing;
@@ -292,3 +292,14 @@ update auth.users set
   phone_change_token         = coalesce(phone_change_token, ''),
   reauthentication_token     = coalesce(reauthentication_token, '')
 where email like '%@jph.local';
+
+-- Arabic labels for the default categories and severities (keeps any custom ones).
+update public.settings set
+  categories = (select jsonb_agg(case when c ? 'ar' then c else c || jsonb_build_object('ar', coalesce(m.ar, c->>'fr')) end)
+                from jsonb_array_elements(categories) c
+                left join (values ('spillage','انسكاب'),('waste','نفايات'),('obstruction','عائق'),('leak','تسرّب'),('dust','غبار'),
+                  ('equipment_left','معدات متروكة'),('cleanliness_ok','النظافة جيدة'),('other','أخرى')) m(key, ar) on m.key = c->>'key'),
+  severities = (select jsonb_agg(case when c ? 'ar' then c else c || jsonb_build_object('ar', coalesce(m.ar, c->>'fr')) end)
+                from jsonb_array_elements(severities) c
+                left join (values ('low','منخفضة'),('medium','متوسطة'),('high','مرتفعة'),('critical','حرجة')) m(key, ar) on m.key = c->>'key')
+where id = 1;
