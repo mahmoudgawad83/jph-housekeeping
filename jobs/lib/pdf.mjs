@@ -1,33 +1,70 @@
-// PDF layout (A4, light theme, matches design-system/MASTER.md colours).
+// PDF layout (A4, light theme) in the JESA corporate style: navy titles, JESA blues for charts,
+// wave background + logos when the branding files are available (Supabase bucket "branding").
 import PDFDocument from 'pdfkit';
 import sharp from 'sharp';
 import { fmtHours } from './analysis.mjs';
 
 const C = {
-  text: '#1E293B', text2: '#475569', border: '#E2E8F0', muted: '#F1F5F9', primary: '#047857', primarySoft: '#ECFDF5',
+  // JESA tokens: navy #253C8D, blue #0483BA, cyan #00BBED, ink #010202, grey-light #CECECE, mist #E2EEEF
+  text: '#010202', text2: '#4B5563', border: '#CECECE', muted: '#E2EEEF', primary: '#253C8D', primarySoft: '#E2EEEF',
+  blue: '#0483BA', cyan: '#00BBED', royal: '#0361AB',
   warnBg: '#FFF7ED', warnFg: '#9A3412',
   sev: { low: ['#E2E8F0', '#334155'], medium: ['#FEF3C7', '#92400E'], high: ['#FFEDD5', '#9A3412'], critical: ['#FEE2E2', '#991B1B'] },
 };
 const M = 40; // page margin
 const W = 595.28 - 2 * M;
 
-function newDoc() {
-  return new PDFDocument({ size: 'A4', margins: { top: M, bottom: M + 10, left: M, right: M }, bufferPages: true, info: { Producer: 'JPH Housekeeping' } });
+/** Re-encode logos/background so PDFKit can embed them (it mis-decodes interlaced PNGs). */
+export async function prepareBrand(raw = {}) {
+  const out = {};
+  for (const [k, buf] of Object.entries(raw)) {
+    if (!buf) continue;
+    try { out[k] = k === 'bg' ? await sharp(buf).resize(1240).jpeg({ quality: 80 }).toBuffer() : await sharp(buf).png({ progressive: false }).toBuffer(); }
+    catch { /* skip unreadable file */ }
+  }
+  return out;
+}
+
+const TOP = 78; // content top on pages 2+ (below the JESA header)
+
+/** brand = { logo, logoSmall, url, bg } image buffers (any may be missing). */
+function newDoc(brand = {}, label = '') {
+  const doc = new PDFDocument({ size: 'A4', margins: { top: TOP, bottom: M + 14, left: M, right: M }, bufferPages: true, info: { Producer: 'JPH Housekeeping', Author: 'JESA' } });
+  const open = (b) => { try { return b ? doc.openImage(b) : null; } catch { return null; } };
+  doc._brand = { logo: open(brand.logo), logoSmall: open(brand.logoSmall), url: open(brand.url), bg: open(brand.bg) };
+  doc.on('pageAdded', () => contentHeader(doc, label));
+  return doc;
+}
+// JESA content-slide header: small logo left, thin ink rule, report label right.
+function contentHeader(doc, label) {
+  const b = doc._brand;
+  const right = M + W;
+  if (b.logoSmall) doc.image(b.logoSmall, M, 24, { width: 92 });
+  else doc.font('Helvetica-Bold').fontSize(13).fillColor(C.primary).text('JESA', M, 28, { lineBreak: false });
+  doc.font('Helvetica').fontSize(8.5).fillColor(C.text).text(label, M + 120, 30, { width: W - 120, align: 'right', lineBreak: false });
+  doc.moveTo(M + 110, 52).lineTo(right - 4, 52).lineWidth(0.6).strokeColor(C.text).stroke();
+  doc.circle(right - 2, 52, 1.8).fill(C.text);
+  doc.x = M; doc.y = TOP;
 }
 function toBuffer(doc) {
   return new Promise((res) => { const chunks = []; doc.on('data', (c) => chunks.push(c)); doc.on('end', () => res(Buffer.concat(chunks))); doc.end(); });
 }
 const ensure = (doc, h) => { if (doc.y + h > doc.page.height - doc.page.margins.bottom) doc.addPage(); };
 
+// Page-1 header in the JESA cover style: wave background band, large logo, navy title.
 function header(doc, title, sub) {
-  doc.rect(0, 0, doc.page.width, 6).fill(C.primary);
-  doc.fillColor(C.text).font('Helvetica-Bold').fontSize(18).text(title, M, M);
-  doc.moveDown(0.2).font('Helvetica').fontSize(11).fillColor(C.text2).text(sub);
-  doc.moveDown(0.8);
+  const b = doc._brand, bandH = 150, pw = doc.page.width;
+  if (b.bg) { doc.save(); doc.rect(0, 0, pw, bandH).clip(); doc.image(b.bg, 0, -20, { width: pw }); doc.restore(); }
+  else doc.rect(0, 0, pw, bandH).fill(C.muted);
+  if (b.logo) doc.image(b.logo, M, 26, { width: 150 });
+  else doc.font('Helvetica-Bold').fontSize(22).fillColor(C.primary).text('JESA', M, 28);
+  doc.fillColor(C.primary).font('Helvetica').fontSize(20).text(title, M, 78, { width: W });
+  doc.font('Helvetica').fontSize(11.5).fillColor(C.text).text(sub, M, doc.y + 3, { width: W });
+  doc.x = M; doc.y = bandH + 16;
 }
 function h2(doc, text, need = 60) {
   ensure(doc, need);
-  doc.moveDown(0.6).font('Helvetica-Bold').fontSize(13).fillColor(C.text).text(text, M);
+  doc.moveDown(0.6).font('Helvetica-Bold').fontSize(13).fillColor(C.primary).text(text, M);
   const y = doc.y + 3; doc.moveTo(M, y).lineTo(M + W, y).lineWidth(0.8).strokeColor(C.border).stroke();
   doc.y = y + 8;
 }
@@ -40,6 +77,7 @@ function box(doc, paragraphs, bg, fg, title) {
   ensure(doc, h + 10);
   const y0 = doc.y;
   doc.roundedRect(M, y0, W, h, 8).fill(bg);
+  doc.rect(M, y0 + 8, 4, h - 16).fill(fg === C.warnFg ? C.warnFg : C.blue); // JESA card side marker
   let y = y0 + pad;
   if (title) { doc.font('Helvetica-Bold').fontSize(11).fillColor(fg).text(title, M + pad, y, { width: W - 2 * pad }); y += titleH; }
   paragraphs.forEach((p, i) => {
@@ -55,7 +93,7 @@ function kpis(doc, items) {
   items.forEach(([label, value, bg], i) => {
     const x = M + i * (w + gap);
     doc.roundedRect(x, y, w, 58, 8).fillAndStroke(bg || '#FFFFFF', C.border);
-    doc.font('Helvetica-Bold').fontSize(20).fillColor(C.text).text(String(value), x + 10, y + 8, { width: w - 20 });
+    doc.font('Helvetica-Bold').fontSize(20).fillColor(C.primary).text(String(value), x + 10, y + 8, { width: w - 20 });
     doc.font('Helvetica').fontSize(8.5).fillColor(C.text2).text(label, x + 10, y + 36, { width: w - 20, height: 20, ellipsis: true });
   });
   doc.y = y + 70; doc.x = M;
@@ -73,7 +111,7 @@ function table(doc, cols, rows, { widths, fontSize = 9.5 } = {}) {
     doc.moveTo(M, y + h).lineTo(M + W, y + h).lineWidth(0.5).strokeColor(C.border).stroke();
     doc.y = y + h; doc.x = M;
   };
-  draw(cols, 'Helvetica-Bold', C.muted, C.text2);
+  draw(cols, 'Helvetica-Bold', C.primary, '#FFFFFF');
   rows.forEach((r) => draw(r, 'Helvetica', null, C.text));
   doc.moveDown(0.5);
 }
@@ -85,7 +123,7 @@ function bars(doc, rows, labelFn) {
     ensure(doc, 18);
     const y = doc.y;
     doc.font('Helvetica').fontSize(9.5).fillColor(C.text).text(labelFn(k), M, y + 2, { width: labelW - 8, height: 12, ellipsis: true });
-    doc.roundedRect(M + labelW, y + 2, Math.max(3, (n / max) * barW), 11, 3).fill('#6EE7B7');
+    doc.roundedRect(M + labelW, y + 2, Math.max(3, (n / max) * barW), 11, 3).fill(C.blue);
     doc.font('Helvetica-Bold').fontSize(9.5).fillColor(C.text).text(String(n), M + labelW + (n / max) * barW + 6, y + 2);
     doc.y = y + 17; doc.x = M;
   });
@@ -105,10 +143,13 @@ function footer(doc, left, tr) {
     doc.switchToPage(i);
     const keep = doc.page.margins.bottom;
     doc.page.margins.bottom = 0; // writing inside the bottom margin must not create a new page
-    const y = doc.page.height - M + 8;
+    const y = doc.page.height - M + 10;
+    doc.moveTo(M, y - 8).lineTo(M + W, y - 8).lineWidth(0.5).strokeColor(C.border).stroke();
     doc.font('Helvetica').fontSize(8).fillColor(C.text2)
-      .text(left, M, y, { width: W / 2, lineBreak: false })
-      .text(`${tr('page')} ${i + 1} / ${range.count}`, M + W / 2, y, { width: W / 2, align: 'right', lineBreak: false });
+      .text(left, M, y, { width: W * 0.5, lineBreak: false })
+      .text(`${tr('page')} ${i + 1} / ${range.count}`, M + W * 0.4, y, { width: W * 0.2, align: 'center', lineBreak: false });
+    if (doc._brand.url) doc.image(doc._brand.url, M + W - 84, y - 2, { width: 84 });
+    else doc.text('jesagroup.com', M + W * 0.6, y, { width: W * 0.4, align: 'right', lineBreak: false });
     doc.page.margins.bottom = keep;
   }
 }
@@ -169,11 +210,11 @@ async function observationCards(doc, list, ctx, photoOpts) {
 
 export async function buildDailyPdf(d, ctx, photoOpts = { px: 900, q: 70 }) {
   const { tr, trs, bloc, ymdLabel, generatedLabel } = ctx;
-  const doc = newDoc();
-  header(doc, `${tr('daily')}`, `${bloc.name} · ${ymdLabel}`);
+  const doc = newDoc(ctx.brand, `${tr.only(tr.language === 'en' ? 'en' : 'fr')('daily')} · ${bloc.name} · ${ymdLabel}`);
+  header(doc, `${tr('daily')}`, `JPH – Jorf Phosphate Hub · ${bloc.name} · ${ymdLabel}`);
   const summary = trs.map((t) => t.summaryDaily);
   if (d.noInput) box(doc, trs.map((t) => t('noInputSentence')), C.warnBg, C.warnFg, tr('noInputTitle'));
-  box(doc, summary, C.primarySoft, '#065F46', tr('summary'));
+  box(doc, summary, C.primarySoft, C.primary, tr('summary'));
   const openNow = d.today.filter((o) => o.status === 'open').length + d.carried.length;
   kpis(doc, [
     [tr('kpiTotal'), d.today.length],
@@ -210,9 +251,9 @@ export async function buildDailyPdf(d, ctx, photoOpts = { px: 900, q: 70 }) {
 
 export async function buildWeeklyPdf(w, ctx) {
   const { tr, trs, bloc, periodLabel, generatedLabel, person } = ctx;
-  const doc = newDoc();
-  header(doc, tr('weekly'), `${bloc.name} · ${periodLabel}`);
-  box(doc, trs.map((t) => t.summaryWeekly), C.primarySoft, '#065F46', tr('summary'));
+  const doc = newDoc(ctx.brand, `${tr.only(tr.language === 'en' ? 'en' : 'fr')('weekly')} · ${bloc.name} · ${periodLabel}`);
+  header(doc, tr('weekly'), `JPH – Jorf Phosphate Hub · ${bloc.name} · ${periodLabel}`);
+  box(doc, trs.map((t) => t.summaryWeekly), C.primarySoft, C.primary, tr('summary'));
   const st = w.stats;
   kpis(doc, [
     [tr('kpiTotal'), st.total], [tr('kpiHigh'), st.high], [tr('kpiClosed'), st.closedCount], [tr('kpiOpen'), w.openNow],
@@ -223,7 +264,7 @@ export async function buildWeeklyPdf(w, ctx) {
   const y0 = doc.y, h = 90, max = Math.max(1, ...st.perDay.map((p) => p.n)), cw = W / st.perDay.length;
   st.perDay.forEach((p, i) => {
     const bh = (p.n / max) * h, x = M + i * cw;
-    doc.roundedRect(x + cw * 0.2, y0 + h - bh, cw * 0.6, Math.max(bh, 1), 3).fill('#6EE7B7');
+    doc.roundedRect(x + cw * 0.2, y0 + h - bh, cw * 0.6, Math.max(bh, 1), 3).fill(C.blue);
     doc.font('Helvetica-Bold').fontSize(9).fillColor(C.text).text(String(p.n), x, y0 + h - bh - 12, { width: cw, align: 'center' });
     doc.font('Helvetica').fontSize(8.5).fillColor(C.text2).text(p.day.slice(8, 10) + '/' + p.day.slice(5, 7), x, y0 + h + 4, { width: cw, align: 'center' });
   });

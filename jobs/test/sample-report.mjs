@@ -1,7 +1,7 @@
 // Builds sample daily + weekly PDFs from fake data (no database needed): node test/sample-report.mjs
 import fs from 'node:fs/promises';
 import sharp from 'sharp';
-import { buildDailyPdf, buildWeeklyPdf } from '../lib/pdf.mjs';
+import { buildDailyPdf, buildWeeklyPdf, prepareBrand } from '../lib/pdf.mjs';
 import { findHotspots, countBy, dailySummary, weeklyStats, weeklySummary } from '../lib/analysis.mjs';
 import { makeTr } from '../lib/text.mjs';
 import { mapSnapshot } from '../lib/mapimg.mjs';
@@ -42,7 +42,11 @@ console.log('map image:', d.mapImg ? `${d.mapImg.length} bytes` : 'none');
 const tr = makeTr('both', settings);
 const trs = ['fr', 'en'].map((l) => { const t = makeTr(l, settings); t.summaryDaily = dailySummary(d, t); return t; });
 const people = { a: 'Youssef A.', b: 'Fatima B.' };
-const ctx = { tr, trs, bloc, settings, photos, person: (id) => people[id], fmtTime: (x) => x.slice(11, 16), fmtDateTime: (x) => x.slice(0, 16).replace('T', ' '),
+// Optional: BRAND_DIR=/path/with/jesa-logo.png,jesa-logo-small.png,jesagroup-com.png,bg-cover.jpg
+const brand = {};
+if (process.env.BRAND_DIR) for (const [k, f] of Object.entries({ logo: 'jesa-logo.png', logoSmall: 'jesa-logo-small.png', url: 'jesagroup-com.png', bg: 'bg-cover.jpg' }))
+  brand[k] = await fs.readFile(`${process.env.BRAND_DIR}/${f}`).catch(() => undefined);
+const ctx = { tr, trs, bloc, settings, photos, brand: await prepareBrand(brand), person: (id) => people[id], fmtTime: (x) => x.slice(11, 16), fmtDateTime: (x) => x.slice(0, 16).replace('T', ' '),
   ymdLabel: '25/11/2026', generatedLabel: 'Généré le 25/11/2026 19:00' };
 await fs.mkdir('out', { recursive: true });
 const pdf = await buildDailyPdf(d, ctx);

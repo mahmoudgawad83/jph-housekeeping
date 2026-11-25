@@ -11,7 +11,7 @@ import { parseArgs } from 'node:util';
 import { zonedParts, startOfDay, addDays, toMinutes, fmtLocal, fmtYmd } from './lib/time.mjs';
 import { findHotspots, countBy, dailySummary, weeklyStats, weeklySummary } from './lib/analysis.mjs';
 import { makeTr } from './lib/text.mjs';
-import { buildDailyPdf, buildWeeklyPdf } from './lib/pdf.mjs';
+import { buildDailyPdf, buildWeeklyPdf, prepareBrand } from './lib/pdf.mjs';
 import { mapSnapshot } from './lib/mapimg.mjs';
 import { driveEnabled, folderPath, upload } from './lib/drive.mjs';
 import { emailEnabled, sendEmail } from './lib/email.mjs';
@@ -53,6 +53,21 @@ async function download(path) {
   if (error) { log('photo missing', path); return null; }
   return Buffer.from(await data.arrayBuffer());
 }
+// JESA branding (logos, background) kept in the private "branding" bucket, not in the public repo.
+let brandCache = null;
+async function loadBrand() {
+  if (brandCache) return brandCache;
+  const files = { logo: 'jesa-logo.png', logoSmall: 'jesa-logo-small.png', url: 'jesagroup-com.png', bg: 'bg-cover.jpg' };
+  brandCache = {};
+  for (const [k, f] of Object.entries(files)) {
+    const { data, error } = await sb.storage.from('branding').download(f);
+    if (!error && data) brandCache[k] = Buffer.from(await data.arrayBuffer());
+  }
+  brandCache = await prepareBrand(brandCache);
+  log(`Branding: ${Object.keys(brandCache).length}/4 file(s) loaded`);
+  return brandCache;
+}
+
 async function alreadySent(blocId, type, period) {
   // A failed or not-yet-configured send does not count: the next hourly run tries again.
   // A manual test sent before the scheduled time does not count either.
@@ -115,8 +130,8 @@ async function dailyData(bloc, ymd) {
 function emailHtml(title, sub, paragraphs, driveLink, extra = '') {
   const e = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   return `<div style="font-family:Inter,Segoe UI,Arial,sans-serif;color:#1E293B;max-width:640px;margin:auto;background:#F8FAFC;padding:24px">
-  <div style="background:#fff;border:1px solid #E2E8F0;border-top:4px solid #047857;border-radius:12px;padding:24px">
-  <h1 style="font-size:20px;margin:0 0 4px">${e(title)}</h1><p style="margin:0 0 16px;color:#475569">${e(sub)}</p>
+  <div style="background:#fff;border:1px solid #E2E8F0;border-top:4px solid #253C8D;border-radius:12px;padding:24px">
+  <h1 style="font-size:20px;margin:0 0 4px;color:#253C8D;font-family:Verdana,Arial,sans-serif">${e(title)}</h1><p style="margin:0 0 16px;color:#475569">${e(sub)}</p>
   ${paragraphs.map((p, i) => `<p style="margin:0 0 10px;line-height:1.5;${i ? 'color:#475569' : ''}">${e(p)}</p>`).join('')}
   ${extra}
   ${driveLink ? `<p style="margin:16px 0 0"><a href="${e(driveLink)}" style="color:#1D4ED8">${e(tr('emailDrive'))}</a></p>` : ''}
@@ -156,7 +171,7 @@ async function sendDaily(bloc, ymd) {
   const trs = langs.map((l) => { const t = makeTr(l, settings); t.summaryDaily = dailySummary(d, t); return t; });
   const photos = new Map();
   for (const o of [...d.today, ...d.carried]) for (const p of [o.temp_photo_path, o.closing_temp_path]) if (p) photos.set(p, await download(p));
-  const ctx = { tr, trs, bloc, settings, photos, person, fmtTime, fmtDateTime,
+  const ctx = { tr, trs, bloc, settings, photos, person, fmtTime, fmtDateTime, brand: await loadBrand(),
     ymdLabel: fmtYmd(ymd), generatedLabel: `${tr('generated')} ${fmtDateTime(new Date())}` };
   const recipients = must(await sb.from('bloc_recipients').select('*').eq('bloc_id', bloc.id).eq('daily', true));
   await deliver({ bloc, type: 'daily', period: ymd, recipients,
@@ -183,7 +198,7 @@ async function sendWeekly(bloc, ymd) {
     { lat: bloc.center_lat, lng: bloc.center_lng, zoom: bloc.zoom }).catch(() => null);
   const period = `${startY}_${addDays(endY, -1)}`;
   const periodLabel = `${fmtYmd(startY)} – ${fmtYmd(addDays(endY, -1))}`;
-  const ctx = { tr, trs, bloc, settings, person, fmtDateTime, periodLabel, generatedLabel: `${tr('generated')} ${fmtDateTime(new Date())}` };
+  const ctx = { tr, trs, bloc, settings, person, fmtDateTime, periodLabel, brand: await loadBrand(), generatedLabel: `${tr('generated')} ${fmtDateTime(new Date())}` };
   const recipients = must(await sb.from('bloc_recipients').select('*').eq('bloc_id', bloc.id).eq('weekly', true));
   await deliver({ bloc, type: 'weekly', period, recipients,
     subject: `${tr.only(langs[0])('weekly')} – ${bloc.name} – ${periodLabel}`,

@@ -262,6 +262,17 @@ grant execute on all functions in schema public to service_role;
 grant execute on function public.is_admin() to authenticated;
 grant execute on function public.my_bloc_ids() to authenticated;
 
+-- Private branding files (JESA logos/background) for the PDF reports. Admins upload, the report engine reads.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('branding', 'branding', false, 5242880, array['image/png','image/jpeg'])
+on conflict (id) do nothing;
+drop policy if exists branding_admin_read on storage.objects;
+drop policy if exists branding_admin_write on storage.objects;
+drop policy if exists branding_admin_update on storage.objects;
+create policy branding_admin_read on storage.objects for select to authenticated using (bucket_id = 'branding' and public.is_admin());
+create policy branding_admin_write on storage.objects for insert to authenticated with check (bucket_id = 'branding' and public.is_admin());
+create policy branding_admin_update on storage.objects for update to authenticated using (bucket_id = 'branding' and public.is_admin());
+
 -- Grants for the RPCs
 revoke execute on function public.admin_create_user(text,text,text,text) from public, anon;
 revoke execute on function public.admin_set_password(uuid,text) from public, anon;
