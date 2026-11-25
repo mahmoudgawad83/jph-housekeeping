@@ -55,8 +55,12 @@ async function download(path) {
 }
 async function alreadySent(blocId, type, period) {
   // A failed or not-yet-configured send does not count: the next hourly run tries again.
-  const { data } = await sb.from('reports').select('id, status').eq('bloc_id', blocId).eq('type', type).eq('period', period).maybeSingle();
-  return Boolean(data) && !['error', 'email_not_configured'].includes(data.status);
+  // A manual test sent before the scheduled time does not count either.
+  const { data } = await sb.from('reports').select('id, status, sent_at').eq('bloc_id', blocId).eq('type', type).eq('period', period).maybeSingle();
+  if (!data || ['error', 'email_not_configured'].includes(data.status)) return false;
+  const due = { daily: settings.daily_time, weekly: settings.weekly_time }[type];
+  if (due) { const p = zonedParts(new Date(data.sent_at), TZ); if (p.ymd === today && p.hh * 60 + p.mm < toMinutes(due)) return false; }
+  return true;
 }
 async function record(row) {
   if (DRY) return;
