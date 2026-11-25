@@ -184,7 +184,10 @@ function renderLogin() {
     const err = document.getElementById('loginErr'); err.textContent = '';
     await busy(btn, async () => {
       const { data, error } = await sb.auth.signInWithPassword({ email: usernameEmail(fd.get('username')), password: fd.get('password') });
-      if (error) { err.textContent = t('badLogin'); return; }
+      if (error) {
+        err.textContent = /invalid login credentials/i.test(error.message) ? t('badLogin') : t('error', { m: error.message });
+        return;
+      }
       state.session = data.session; state.profile = null;
       location.hash = '#/'; await route();
     });
