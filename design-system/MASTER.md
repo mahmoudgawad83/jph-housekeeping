@@ -19,8 +19,9 @@ Light only. No dark surfaces anywhere (user requirement). The `color-scheme: lig
 | `--border` | `#E2E8F0` | dividers, card borders | — |
 | `--text` | `#1E293B` | body text | 14.6:1 on white |
 | `--text-2` | `#475569` | secondary text | 7.6:1 on white |
-| `--primary` | `#047857` | primary buttons, active states (OCP green) | 5.5:1 with white text |
-| `--primary-soft` | `#ECFDF5` | selected chips, success banners | — |
+| `--primary` | `#253C8D` | primary buttons, titles, active states (JESA navy) | 9.6:1 with white text |
+| `--primary-soft` | `#EAF0FB` | active nav pill, soft highlights | — |
+| `--cyan` | `#00BBED` | JESA cyan: icon tone fill (20%), focus accents; never text | — |
 | `--accent` | `#C2410C` | safety orange: warnings, "high" | 5.2:1 with white |
 | `--danger` | `#B91C1C` | critical, destructive | 6.5:1 with white |
 | `--info` | `#1D4ED8` | links, info | 6.7:1 with white |
@@ -54,3 +55,6 @@ Lucide (inline SVG, 24px, stroke 2). Decorative icons next to text get `aria-hid
 
 ## Layout
 Mobile-first. Top app bar + full-height map + bottom sheet list + one floating "New observation" button. Safe-area insets respected. Desktop: content max-width 1100px; admin uses a two-column layout ≥ 900px.
+
+## Icons (v2, Nov 2026)
+Custom two-tone line icons on a 24px grid: 1.8px round stroke in `currentColor` plus a `.tone` shape filled with JESA cyan at 20% (white at 28% on navy buttons). Every category has its own icon (spillage drop, waste bin, barrier, leaking pipe, dust, toolbox, cleanliness check, other). Icons always sit next to a text label.

@@ -18,29 +18,41 @@ const state = {
 
 // ───────── Icons (Lucide, MIT) ─────────
 const ICONS = {
-  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
-  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
-  more: '<circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>',
-  back: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
-  pin: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
-  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
-  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
-  lang: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
-  check: '<path d="M20 6 9 17l-5-5"/>',
-  undo: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
-  ext: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
-  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
-  spark: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
-  locate: '<circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/>',
-  list: '<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>',
-  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
-  sliders: '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
-  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
-  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
-  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
-  image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  // Custom two-tone line icons (24px grid, 1.8 stroke): an outline plus a soft "tone" fill.
+  camera: '<rect class="tone" x="3" y="7" width="18" height="13" rx="3"/><path d="M8.5 7 10 4.5h4L15.5 7H18a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-7a3 3 0 0 1 3-3z"/><circle cx="12" cy="13" r="3.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  more: '<circle class="tone" cx="12" cy="12" r="9"/><circle cx="7.5" cy="12" r="1.1"/><circle cx="12" cy="12" r="1.1"/><circle cx="16.5" cy="12" r="1.1"/>',
+  back: '<path d="M15 5l-7 7 7 7"/>',
+  pin: '<path class="tone" d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.3"/>',
+  map: '<path class="tone" d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6z"/><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6z"/><path d="M9 4v14M15 6v14"/>',
+  list: '<rect class="tone" x="4.5" y="4" width="15" height="17" rx="3"/><rect x="4.5" y="4" width="15" height="17" rx="3"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/>',
+  shield: '<path class="tone" d="M12 3 5 6v5.5c0 4.5 3 7.8 7 9.5 4-1.7 7-5 7-9.5V6z"/><path d="M12 3 5 6v5.5c0 4.5 3 7.8 7 9.5 4-1.7 7-5 7-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
+  logout: '<path d="M14 4h3a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3h-3"/><path d="M10 8l-4 4 4 4M6 12h9"/>',
+  lang: '<circle class="tone" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  undo: '<path d="M9 7 5 11l4 4"/><path d="M5 11h9.5a4.5 4.5 0 0 1 0 9H11"/>',
+  ext: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v3a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h3"/>',
+  trash: '<path class="tone" d="M6 7h12l-1 12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2z"/><path d="M4 7h16M9 7V4.5h6V7M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M10 11v6M14 11v6"/>',
+  spark: '<path class="tone" d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/><path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/>',
+  locate: '<circle class="tone" cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+  users: '<circle class="tone" cx="9" cy="8" r="3.5"/><circle cx="9" cy="8" r="3.5"/><path d="M3 20c.6-3.4 3-5.5 6-5.5s5.4 2.1 6 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.6.8 2.7 2.6 3 5.2"/>',
+  mail: '<rect class="tone" x="3" y="5" width="18" height="14" rx="3"/><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7.5 8 5.5 8-5.5"/>',
+  sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle class="tone" cx="15" cy="7" r="2.3"/><circle cx="15" cy="7" r="2.3"/><circle class="tone" cx="9" cy="17" r="2.3"/><circle cx="9" cy="17" r="2.3"/>',
+  file: '<path class="tone" d="M6 3h8l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M6 3h8l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M14 3v5h5M8 13h8M8 17h5"/>',
+  download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path class="tone" d="M4 15v2a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-2z"/><path d="M4 15v2a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-2"/>',
+  layers: '<path class="tone" d="m12 3 9 5-9 5-9-5z"/><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 12.5 9 5 9-5M3 16.5l9 5 9-5"/>',
+  image: '<rect class="tone" x="3" y="4" width="18" height="16" rx="3"/><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 9"/>',
+  // Category icons
+  cat_spillage: '<ellipse class="tone" cx="12" cy="18.5" rx="8" ry="2.5"/><ellipse cx="12" cy="18.5" rx="8" ry="2.5"/><path d="M12 3.5s-4 4.6-4 7.6a4 4 0 0 0 8 0c0-3-4-7.6-4-7.6z"/>',
+  cat_waste: '<path class="tone" d="M6.5 8h11l-1 11.5a1.8 1.8 0 0 1-1.8 1.5H9.3a1.8 1.8 0 0 1-1.8-1.5z"/><path d="M6.5 8h11l-1 11.5a1.8 1.8 0 0 1-1.8 1.5H9.3a1.8 1.8 0 0 1-1.8-1.5zM4.5 8h15M9.5 8V5.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V8M10.5 12v5M13.5 12v5"/>',
+  cat_obstruction: '<rect class="tone" x="3" y="7" width="18" height="6" rx="1.5"/><rect x="3" y="7" width="18" height="6" rx="1.5"/><path d="M8 7l-4 6M14 7l-5 6M20 7l-5 6M6.5 13v7M17.5 13v7M4.5 20h4M15.5 20h4"/>',
+  cat_leak: '<path class="tone" d="M3 5h9a4 4 0 0 1 4 4v1h-4V9H3z"/><path d="M3 5h9a4 4 0 0 1 4 4v1h-4V9H3M11 10h6"/><path d="M14 14s-2.3 2.6-2.3 4.3a2.3 2.3 0 0 0 4.6 0C16.3 16.6 14 14 14 14z"/>',
+  cat_dust: '<circle class="tone" cx="17" cy="7" r="3"/><path d="M3 9h10.5a2.5 2.5 0 1 0-2.5-2.5M3 13h14.5a2.5 2.5 0 1 1-2.5 2.5M3 17h7"/><circle cx="19" cy="19.5" r=".7"/><circle cx="14" cy="20.5" r=".7"/>',
+  cat_equipment_left: '<rect class="tone" x="3" y="8" width="18" height="12" rx="2.5"/><rect x="3" y="8" width="18" height="12" rx="2.5"/><path d="M9 8V5.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V8M3 13h18M10 13v2h4v-2"/>',
+  cat_cleanliness_ok: '<circle class="tone" cx="12" cy="13" r="8"/><circle cx="12" cy="13" r="8"/><path d="m8.5 13 2.4 2.4 4.6-4.8"/><path d="M19.5 2.5v3M18 4h3"/>',
+  cat_other: '<circle class="tone" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="M8 12h.01M12 12h.01M16 12h.01"/>',
 };
+const catIcon = (k) => (ICONS['cat_' + k] ? 'cat_' + k : 'cat_other');
 const icon = (n) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const spinner = '<span class="spinner" aria-hidden="true"></span>';
@@ -200,7 +212,7 @@ window.addEventListener('hashchange', () => route().catch(fail));
 // Bottom navigation bar: one tap to the main places (icons + labels, never icons alone).
 function bottomNav(active) {
   const items = [
-    ['map', '#/', 'pin', t('map')],
+    ['map', '#/', 'map', t('map')],
     ['open', '#/open', 'list', t('open')],
     ['new', '#/new', 'camera', t('newShort')],
     ...(isAdmin() ? [['admin', '#/admin', 'shield', t('admin')]] : []),
@@ -335,10 +347,11 @@ function obsCard(o, url) {
     ${url ? `<img src="${esc(url)}" alt="" loading="lazy" width="72" height="72">` : `<span class="ph" style="display:grid;place-items:center;color:var(--text-2)">${icon('image')}</span>`}
     <span class="grow">
       <span class="t">${esc(o.area || catLabel(o.category))}</span>
-      <span class="meta" style="display:block">${esc(catLabel(o.category))} · ${esc(fmtDateTime(o.created_at))} · ${esc(person(o.supervisor_id))}</span>
-      <span class="badges">${sevBadge(o.severity)}${statusBadge(o.status)}</span>
+      <span class="meta" style="display:block">${esc(fmtDateTime(o.created_at))} · ${esc(person(o.supervisor_id))}</span>
+      <span class="badges">${catBadge(o.category)}${sevBadge(o.severity)}${statusBadge(o.status)}</span>
     </span></a>`;
 }
+const catBadge = (c) => `<span class="badge cat">${icon(catIcon(c))}${esc(catLabel(c))}</span>`;
 const sevBadge = (s) => `<span class="badge sev-${esc(s)}">${esc(sevLetter(s))} · ${esc(sevLabel(s))}</span>`;
 const statusBadge = (s) => `<span class="badge st-${esc(s)}">${esc(s === 'closed' ? t('statusClosed') : t('statusOpen'))}</span>`;
 
@@ -365,7 +378,7 @@ function renderNew() {
       <input class="input" name="area" list="areas" autocomplete="off" placeholder="${esc(t('areaHint'))}"><datalist id="areas"></datalist>
       <p class="err" id="err-area"></p></label>
     <fieldset class="field" style="border:0;padding:0;margin-top:16px"><legend class="lbl">${esc(t('category'))}</legend>
-      <div class="chips" id="cats">${s.categories.map((c) => `<button type="button" class="chip" data-k="${esc(c.key)}" aria-pressed="false">${esc(label(c))}</button>`).join('')}</div>
+      <div class="chips" id="cats">${s.categories.map((c) => `<button type="button" class="chip cat-chip" data-k="${esc(c.key)}" aria-pressed="false">${icon(catIcon(c.key))}${esc(label(c))}</button>`).join('')}</div>
       <p class="err" id="err-cat"></p></fieldset>
     <fieldset class="field" style="border:0;padding:0"><legend class="lbl">${esc(t('severity'))}</legend>
       <div class="chips" id="sevs">${s.severities.map((c) => `<button type="button" class="chip" data-k="${esc(c.key)}" aria-pressed="false"><span class="badge sev-${esc(c.key)}">${esc(sevLetter(c.key))}</span>${esc(label(c))}</button>`).join('')}</div>
@@ -492,7 +505,7 @@ async function renderDetail(id) {
   const maps = o.lat != null ? `https://www.google.com/maps?q=${o.lat},${o.lng}` : null;
   $app.innerHTML = topbar({ backTo: '#/', title: o.area || catLabel(o.category) }) + `<main id="main" class="page stack">
     ${photo ? `<img class="detail-photo" src="${esc(photo)}" alt="${esc(o.area)}">` : o.drive_link ? `<a class="btn block" href="${esc(o.drive_link)}" target="_blank" rel="noopener">${icon('ext')}${esc(t('openInDrive'))}</a>` : ''}
-    <div class="badges">${sevBadge(o.severity)}${statusBadge(o.status)}<span class="badge">${esc(catLabel(o.category))}</span></div>
+    <div class="badges">${sevBadge(o.severity)}${statusBadge(o.status)}${catBadge(o.category)}</div>
     <div class="card"><dl class="kv">
       <dt>${esc(t('bloc'))}</dt><dd>${esc(blocName(o.bloc_id))}</dd>
       <dt>${esc(t('area'))}</dt><dd>${esc(o.area)}</dd>
