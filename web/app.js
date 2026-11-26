@@ -618,8 +618,23 @@ async function renderDetail(id) {
           <img id="afterPrev" class="detail-photo" alt="${esc(t('afterPhoto'))}" hidden style="margin-top:8px"></div>
         <label class="field"><span class="lbl">${esc(t('closingComment'))} <span class="muted">(${esc(t('optional'))})</span></span><textarea class="input" name="cc" rows="2"></textarea></label>
         <button class="btn primary block" type="submit">${icon('check')}${esc(t('markClosed'))}</button></form>`}
+    ${isAdmin() ? `<button class="btn danger block" id="delObs">${icon('trash')}${esc(t('deleteObs'))}</button>` : ''}
   </main>${bottomNav('')}`;
   bindTopbar(); bindBottomNav();
+  const delBtn = document.getElementById('delObs');
+  if (delBtn) delBtn.onclick = () => {
+    if (!confirm(t('confirmDeleteObs'))) return;
+    busy(delBtn, async () => {
+      try {
+        // Remove the app's temporary photo copies (the Google Drive archive is kept), then the observation.
+        const paths = [o.temp_photo_path, o.closing_temp_path].filter(Boolean);
+        if (paths.length) await sb.storage.from(BUCKET).remove(paths);
+        const { error: er } = await sb.from('observations').delete().eq('id', o.id);
+        if (er) throw er;
+        toast(t('deletedOk')); location.hash = '#/';
+      } catch (err) { fail(err); }
+    });
+  };
   if (o.status === 'closed') {
     document.getElementById('reopen').onclick = (e) => busy(e.currentTarget, async () => {
       const { error: er } = await sb.from('observations').update({ status: 'open', closed_at: null, closed_by: null }).eq('id', o.id);
@@ -923,7 +938,17 @@ async function adminReports(pane) {
     ${(data || []).length ? data.map((r) => `<tr><td>${esc(fmtDateTime(r.sent_at))}</td><td>${esc(blocName(r.bloc_id))}</td><td>${esc(r.type)}${r.status !== 'sent' ? ` <span class="badge sev-high">${esc(r.status)}</span>` : ''}</td><td>${esc(r.period)}</td>
       <td class="small">${esc((r.recipients || []).join(', '))}${r.note ? `<br><span class="muted">${esc(r.note)}</span>` : ''}</td>
       <td>${r.pdf_link ? `<a href="${esc(r.pdf_link)}" target="_blank" rel="noopener">${icon('ext')}<span class="sr">PDF</span></a>` : ''}</td></tr>`).join('')
-      : `<tr><td colspan="6" class="muted">${esc(t('none'))}</td></tr>`}</tbody></table></div>`;
+      : `<tr><td colspan="6" class="muted">${esc(t('none'))}</td></tr>`}</tbody></table></div>
+    <h2 class="st-h" style="margin-top:24px">${icon('trash')}${esc(t('deletedLog'))}</h2>
+    <div class="card" style="overflow-x:auto" id="delLog"><p class="muted">…</p></div>`;
+  const { data: dl, error: de } = await sb.from('deleted_observations').select('*').order('deleted_at', { ascending: false }).limit(100);
+  const box = pane.querySelector('#delLog');
+  if (de) { box.innerHTML = `<p class="muted small">${esc(t('none'))}</p>`; return; }
+  box.innerHTML = `<table class="table"><thead><tr><th>${esc(t('deletedAt'))}</th><th>${esc(t('deletedBy'))}</th><th>${esc(t('bloc'))}</th><th>${esc(t('area'))}</th><th>${esc(t('category'))}</th><th>${esc(t('time'))}</th><th>Drive</th></tr></thead><tbody>
+    ${(dl || []).length ? dl.map((r) => { const o = r.data || {}; return `<tr><td>${esc(fmtDateTime(r.deleted_at))}</td><td>${esc(person(r.deleted_by))}</td><td>${esc(blocName(r.bloc_id))}</td>
+      <td>${esc(o.area || '')}</td><td>${esc(catLabel(o.category))}</td><td>${o.created_at ? esc(fmtDateTime(o.created_at)) : ''} · ${esc(person(o.supervisor_id))}</td>
+      <td>${o.drive_link ? `<a href="${esc(o.drive_link)}" target="_blank" rel="noopener">${icon('ext')}<span class="sr">Drive</span></a>` : ''}</td></tr>`; }).join('')
+      : `<tr><td colspan="7" class="muted">${esc(t('none'))}</td></tr>`}</tbody></table>`;
 }
 
 // ───────── Export (Excel / CSV) ─────────
