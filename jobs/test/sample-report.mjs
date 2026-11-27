@@ -31,9 +31,10 @@ const carried = [mk(30, -4, { ageDays: 4 }), mk(31, -2, { ageDays: 2 })];
 today.forEach((o, i) => (o.n = i + 1));
 
 const photos = new Map();
+const SAMPLE = process.env.SAMPLE_PHOTO ? await fs.readFile(process.env.SAMPLE_PHOTO) : null; // optional realistic photo for demos
 for (const o of [...today, ...carried]) {
   const hue = (Number(o.id.slice(-3)) * 47) % 360;
-  photos.set(o.temp_photo_path, await sharp({ create: { width: 1600, height: 1200, channels: 3, background: `hsl(${hue},40%,70%)` } }).jpeg().toBuffer());
+  photos.set(o.temp_photo_path, SAMPLE || await sharp({ create: { width: 1600, height: 1200, channels: 3, background: `hsl(${hue},40%,70%)` } }).jpeg().toBuffer());
 }
 const hotspots = findHotspots(today, [...today, ...history], { radius: 25, min: 3 });
 const d = { today, carried, hotspots, closedToday: 1, supervisors: ['a', 'b'], noInput: false,

@@ -305,3 +305,5 @@ section.card:has(.vbars) { padding-bottom: 34px; }
 .req-links { display: flex; flex-wrap: wrap; gap: 4px 12px; width: 100%; }
 .req-res a { font-weight: 600; }
 .nowrap { white-space: nowrap; }
+
+.photo-box .btn { white-space: nowrap; }
