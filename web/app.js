@@ -596,7 +596,7 @@ async function renderDetail(id) {
   const photo = urls[o.temp_photo_path], after = urls[o.closing_temp_path];
   const maps = o.lat != null ? `https://www.google.com/maps?q=${o.lat},${o.lng}` : null;
   $app.innerHTML = topbar({ backTo: '#/', title: o.area || catLabel(o.category) }) + `<main id="main" class="page stack">
-    ${photo ? `<img class="detail-photo" src="${esc(photo)}" alt="${esc(o.area)}">` : o.drive_link ? `<a class="btn block" href="${esc(o.drive_link)}" target="_blank" rel="noopener">${icon('ext')}${esc(t('openInDrive'))}</a>` : ''}
+    ${photo ? `<img class="detail-photo" src="${esc(photo)}" alt="${esc(o.area)}">` : o.drive_link && isAdmin() ? `<a class="btn block" href="${esc(o.drive_link)}" target="_blank" rel="noopener">${icon('ext')}${esc(t('openInDrive'))}</a>` : ''}
     <div class="badges">${sevBadge(o.severity)}${statusBadge(o.status)}${catBadge(o.category)}</div>
     <div class="card"><dl class="kv">
       <dt>${esc(t('bloc'))}</dt><dd>${esc(blocName(o.bloc_id))}</dd>
@@ -605,12 +605,12 @@ async function renderDetail(id) {
       <dt>${esc(t('time'))}</dt><dd>${esc(new Date(o.created_at).toLocaleString(locale()))}</dd>
       <dt>${esc(t('coords'))}</dt><dd><span dir="ltr">${maps ? `<a href="${maps}" target="_blank" rel="noopener">${o.lat.toFixed(6)}, ${o.lng.toFixed(6)}</a>${o.gps_accuracy ? ` <span class="muted">(±${Math.round(o.gps_accuracy)} m)</span>` : ''}` : '—'}</span></dd>
       ${o.comment ? `<dt>${esc(t('comment'))}</dt><dd>${esc(o.comment)}</dd>` : ''}
-      ${o.drive_link && photo ? `<dt>Drive</dt><dd><a href="${esc(o.drive_link)}" target="_blank" rel="noopener">${esc(t('openInDrive'))}</a></dd>` : ''}
+      ${o.drive_link && photo && isAdmin() ? `<dt>Drive</dt><dd><a href="${esc(o.drive_link)}" target="_blank" rel="noopener">${esc(t('openInDrive'))}</a></dd>` : ''}
     </dl></div>
     ${o.status === 'closed' ? `<section class="card stack"><h2>${esc(t('statusClosed'))}</h2>
         <p class="muted small">${esc(fmtDateTime(o.closed_at))} · ${esc(person(o.closed_by))}</p>
         ${o.closing_comment ? `<p>${esc(o.closing_comment)}</p>` : ''}
-        ${after ? `<img class="detail-photo" src="${esc(after)}" alt="${esc(t('afterPhoto'))}">` : o.closing_photo_link ? `<a href="${esc(o.closing_photo_link)}" target="_blank" rel="noopener">${esc(t('afterPhoto'))} – Drive</a>` : ''}
+        ${after ? `<img class="detail-photo" src="${esc(after)}" alt="${esc(t('afterPhoto'))}">` : o.closing_photo_link && isAdmin() ? `<a href="${esc(o.closing_photo_link)}" target="_blank" rel="noopener">${esc(t('afterPhoto'))} – Drive</a>` : ''}
         <button class="btn block" id="reopen">${icon('undo')}${esc(t('reopen'))}</button></section>`
     : `<form class="card stack" id="closeForm"><h2>${esc(t('markClosed'))}</h2>
         <div><button type="button" class="btn block" id="afterBtn">${icon('camera')}<span>${esc(t('afterPhoto'))} (${esc(t('optional'))})</span></button>

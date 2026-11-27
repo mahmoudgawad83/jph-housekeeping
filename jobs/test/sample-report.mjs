@@ -22,7 +22,7 @@ const mk = (i, dayOffset, extra = {}) => ({
   created_at: new Date(Date.UTC(2026, 10, 25 + dayOffset, 8 + (i % 9), i * 7 % 60)).toISOString(),
   lat: 33.1050 + ((i * 37) % 11 - 5) * 0.0004, lng: -8.6370 + ((i * 53) % 13 - 6) * 0.0004, gps_accuracy: 6,
   area: areas[i % 4], category: cats[i % 4], severity: sevs[i % 4], comment: i % 3 ? 'Déversement de phosphate près du convoyeur, à nettoyer.' : '',
-  status: i % 5 === 0 ? 'closed' : 'open', temp_photo_path: `p${i}`, closed_at: null, ...extra,
+  status: i % 5 === 0 ? 'closed' : 'open', temp_photo_path: `p${i}`, drive_link: 'https://drive.google.com/file/d/demo/view', closed_at: null, ...extra,
 });
 const today = Array.from({ length: 7 }, (_, i) => mk(i + 1, 0));
 today.push(mk(20, 0, { lat: 33.1050, lng: -8.6370, category: 'spillage', area: 'Convoyeur C3' }));

@@ -20,7 +20,7 @@ const W = {
   comment: ['Commentaire', 'Comment'], status: ['Statut', 'Status'], age: ['Âge', 'Age'], date: ['Date', 'Date'],
   open: ['Ouverte', 'Open'], closed: ['Clôturée', 'Closed'],
   after: ['Photo après', 'After photo'], drive: ['Archive Drive', 'Drive archive'],
-  photoArchived: ['Photo archivée sur Google Drive', 'Photo archived in Google Drive'],
+  photoArchived: ['Photo archivée', 'Photo archived'],
   generated: ['Généré le', 'Generated'], page: ['Page', 'Page'],
   noInputTitle: ['Aucune saisie', 'No inputs'],
   noInputSentence: ['Aucune observation n’a été saisie pour ce Bloc aujourd’hui.', 'No observation was recorded for this Bloc today.'],
@@ -45,7 +45,9 @@ const W = {
   emailIntro: ['Veuillez trouver ci-joint le rapport.', 'Please find the report attached.'],
   emailDrive: ['Copie archivée sur Google Drive', 'Archived copy in Google Drive'],
   wordLink: ['Rapport Word (Google Drive)', 'Word report (Google Drive)'],
-  pdfTooBig: ['Le PDF est trop volumineux pour l’e-mail ; utilisez le lien Drive.', 'The PDF is too large for e-mail; please use the Drive link.'],
+  pdfTooBig: ['Le PDF est trop volumineux pour l’e-mail ; demandez une copie à l’administrateur.', 'The PDF is too large for e-mail; please ask the administrator for a copy.'],
+  wordFollows: ['Le rapport Word suit dans un second e-mail.', 'The Word report follows in a second e-mail.'],
+  wordTooBig: ['Le rapport Word est trop volumineux pour l’e-mail ; demandez une copie à l’administrateur.', 'The Word report is too large for e-mail; please ask the administrator for a copy.'],
 };
 
 export function makeTr(language, settings) {

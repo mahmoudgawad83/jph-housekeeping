@@ -1,7 +1,7 @@
 // Word (.docx) version of the daily and weekly reports — same content as the PDF, JESA style, editable.
 import {
   Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType,
-  BorderStyle, ShadingType, Header, Footer, PageNumber, HeadingLevel, VerticalAlign, ExternalHyperlink,
+  BorderStyle, ShadingType, Header, Footer, PageNumber, HeadingLevel, VerticalAlign,
 } from 'docx';
 import sharp from 'sharp';
 import { fmtHours } from './analysis.mjs';
@@ -115,7 +115,6 @@ async function observationTable(list, ctx, photoPx) {
       ...(o.ageDays != null ? [p([t(`${tr('age')}: `, { color: GREY, size: 18 }), t(`${o.ageDays} j/d`, { size: 18 })], { after: 20 })] : []),
       ...(o.comment ? [p([t(`${tr('comment')}: `, { color: GREY, size: 18 }), t(o.comment, { size: 18 })], { after: 20 })] : []),
       ...(o.status === 'closed' && o.closing_comment ? [p([t(`${tr('closed')}: `, { color: GREY, size: 18 }), t(o.closing_comment, { size: 18 })], { after: 20 })] : []),
-      ...(o.drive_link ? [p([new ExternalHyperlink({ link: o.drive_link, children: [new TextRun({ text: tr('drive'), style: 'Hyperlink', font: FONT, size: 18 })] })], { after: 0 })] : []),
     ];
     rows.push(new TableRow({ cantSplit: true, children: [
       cell(pic, { width: 3600, valign: VerticalAlign.TOP }), cell(lines, { width: PAGE_W - 3600, valign: VerticalAlign.TOP }),

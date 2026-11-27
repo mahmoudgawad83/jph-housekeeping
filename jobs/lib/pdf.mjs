@@ -192,7 +192,6 @@ async function observationCards(doc, list, ctx, photoOpts) {
       doc.font('Helvetica').fontSize(10).fillColor(C.text).text(v, tx, doc.y, { width: tw });
       doc.y += 2;
     }
-    if (o.drive_link) doc.font('Helvetica').fontSize(9).fillColor('#1D4ED8').text(tr('drive'), tx, doc.y, { width: tw, link: o.drive_link, underline: true });
     const afterBuf = photos.get(o.closing_temp_path);
     let bottom = Math.max(y + imgH, doc.y);
     if (afterBuf) {

@@ -148,14 +148,13 @@ async function dailyData(bloc, ymd) {
   return d;
 }
 
-function emailHtml(title, sub, paragraphs, driveLink, extra = '') {
+function emailHtml(title, sub, paragraphs, extra = '') { // recipients never get Drive links (admin backup only)
   const e = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   return `<div style="font-family:Inter,Segoe UI,Arial,sans-serif;color:#1E293B;max-width:640px;margin:auto;background:#F8FAFC;padding:24px">
   <div style="background:#fff;border:1px solid #E2E8F0;border-top:4px solid #253C8D;border-radius:12px;padding:24px">
   <h1 style="font-size:20px;margin:0 0 4px;color:#253C8D;font-family:Verdana,Arial,sans-serif">${e(title)}</h1><p style="margin:0 0 16px;color:#475569">${e(sub)}</p>
   ${paragraphs.map((p, i) => `<p style="margin:0 0 10px;line-height:1.5;${i ? 'color:#475569' : ''}">${e(p)}</p>`).join('')}
   ${extra}
-  ${driveLink ? `<p style="margin:16px 0 0"><a href="${e(driveLink)}" style="color:#1D4ED8">${e(tr('emailDrive'))}</a></p>` : ''}
   ${extra}
   <p style="margin:16px 0 0;color:#475569;font-size:13px">${e(tr('emailIntro'))}</p></div></div>`;
 }
@@ -189,17 +188,21 @@ async function deliver({ bloc, type, period, subject, title, sub, paragraphs, bu
   if (!to.length) { status = 'no_recipients'; }
   else if (!emailEnabled) { status = 'email_not_configured'; }
   else {
-    // Attach both files when they fit; otherwise the PDF only and the Word file as a Drive link.
+    // Attach both files when they fit; otherwise the PDF first and the Word file in a second e-mail. No Drive links.
     const attachments = [];
-    let size = 0, wordAsLink = false;
+    let size = 0, wordSeparately = false;
+    const notes = [];
     if (pdf && pdf.length <= MAX_ATTACH) { attachments.push({ filename: `${base}.pdf`, content: pdf }); size += pdf.length; }
-    if (docx) { if (size + docx.length <= MAX_ATTACH) attachments.push({ filename: `${base}.docx`, content: docx }); else wordAsLink = true; }
-    if (pdf && pdf.length > MAX_ATTACH) note = tr('pdfTooBig');
-    const e = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    const extra = wordAsLink && docxLink ? `<p style="margin:12px 0 0"><a href="${e(docxLink)}" style="color:#1D4ED8">${e(tr('wordLink'))}</a></p>` : '';
+    if (pdf && pdf.length > MAX_ATTACH) notes.push(tr('pdfTooBig'));
+    if (docx) {
+      if (size + docx.length <= MAX_ATTACH) attachments.push({ filename: `${base}.docx`, content: docx });
+      else if (docx.length <= MAX_ATTACH) { wordSeparately = true; notes.push(tr('wordFollows')); }
+      else notes.push(tr('wordTooBig'));
+    }
+    note = notes.join(' ');
     try {
-      await sendEmail({ to, subject, senderName: settings.sender_name,
-        html: emailHtml(title, sub, note ? [...paragraphs, note] : paragraphs, pdfLink || docxLink, extra), attachments });
+      await sendEmail({ to, subject, senderName: settings.sender_name, html: emailHtml(title, sub, [...paragraphs, ...notes]), attachments });
+      if (wordSeparately) await sendEmail({ to, subject: `${subject} (Word)`, senderName: settings.sender_name, html: emailHtml(title, sub, [tr('emailIntro')]), attachments: [{ filename: `${base}.docx`, content: docx }] });
     } catch (err) { status = 'error'; note = err.message.slice(0, 500); log('email failed', err.message); }
   }
   await record({ bloc_id: bloc.id, type, period, pdf_link: pdfLink, docx_link: docxLink, recipients: to.map((x) => x.email), status, note, sent_at: new Date().toISOString() });
@@ -263,7 +266,7 @@ async function noInputCheck(bloc) {
     const time = `${String(loc.hh).padStart(2, '0')}:${String(loc.mm).padStart(2, '0')}`;
     try {
       await sendEmail({ to, senderName: settings.sender_name, subject: t0('alertSubject', { b: bloc.name, d: fmtYmd(today) }),
-        html: emailHtml(tr('noInputTitle'), bloc.name, langs.map((l) => makeTr(l, settings)('alertBody', { b: bloc.name, d: fmtYmd(today), t: time })), null) });
+        html: emailHtml(tr('noInputTitle'), bloc.name, langs.map((l) => makeTr(l, settings)('alertBody', { b: bloc.name, d: fmtYmd(today), t: time }))) });
     } catch (e) { status = 'error'; note = e.message.slice(0, 500); }
   }
   await record({ bloc_id: bloc.id, type: 'no_input_alert', period: today, recipients: to.map((x) => x.email), status, note });
