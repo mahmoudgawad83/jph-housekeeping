@@ -49,3 +49,19 @@ end $$;
 drop trigger if exists report_requests_dispatch on public.report_requests;
 create trigger report_requests_dispatch after insert on public.report_requests
 for each row execute function public.dispatch_report_request();
+
+-- ───────────────────────── Keep at least one active administrator ─────────────────────────
+-- Refuses deleting, demoting or deactivating the last active admin (from the app or the database).
+create or replace function public.protect_last_admin() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if old.role = 'admin' and old.active
+     and (tg_op = 'DELETE' or new.role <> 'admin' or not new.active)
+     and not exists (select 1 from public.profiles where role = 'admin' and active and id <> old.id) then
+    raise exception 'LAST_ADMIN' using hint = 'At least one active administrator must remain.';
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end $$;
+drop trigger if exists profiles_protect_last_admin on public.profiles;
+create trigger profiles_protect_last_admin before update or delete on public.profiles
+for each row execute function public.protect_last_admin();

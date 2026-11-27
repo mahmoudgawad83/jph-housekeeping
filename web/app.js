@@ -66,7 +66,7 @@ function toast(msg, isErr = false) {
   document.getElementById('toast').appendChild(el);
   setTimeout(() => el.remove(), isErr ? 6000 : 3000);
 }
-function fail(e) { console.error(e); toast(t('error', { m: e?.message || e }), true); }
+function fail(e) { console.error(e); const m = String(e?.message || e); toast(m.includes('LAST_ADMIN') ? t('lastAdmin') : t('error', { m }), true); }
 async function busy(btn, fn) {
   const html = btn.innerHTML; btn.disabled = true; btn.innerHTML = spinner + ' ' + esc(t('saving'));
   try { return await fn(); } finally { btn.disabled = false; btn.innerHTML = html; }
