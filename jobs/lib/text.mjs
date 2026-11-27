@@ -44,6 +44,7 @@ const W = {
   alertBody: ['Aucune observation n’a été saisie pour {b} aujourd’hui ({d}) à {t}.', 'No observation has been recorded for {b} today ({d}) as of {t}.'],
   emailIntro: ['Veuillez trouver ci-joint le rapport.', 'Please find the report attached.'],
   emailDrive: ['Copie archivée sur Google Drive', 'Archived copy in Google Drive'],
+  wordLink: ['Rapport Word (Google Drive)', 'Word report (Google Drive)'],
   pdfTooBig: ['Le PDF est trop volumineux pour l’e-mail ; utilisez le lien Drive.', 'The PDF is too large for e-mail; please use the Drive link.'],
 };
 

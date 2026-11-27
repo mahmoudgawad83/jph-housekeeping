@@ -298,3 +298,10 @@ section.card:has(.vbars) { padding-bottom: 34px; }
 .hb-fill { display: block; height: 100%; background: var(--blue); border-radius: 6px; }
 .hb-n { text-align: end; font-weight: 600; font-variant-numeric: tabular-nums; }
 .sevfill-low { background: #94A3B8; } .sevfill-medium { background: #F59E0B; } .sevfill-high { background: #EA580C; } .sevfill-critical { background: #DC2626; }
+
+/* Manual reports */
+.req-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.req-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); font-size: 14px; }
+.req-links { display: flex; flex-wrap: wrap; gap: 4px 12px; width: 100%; }
+.req-res a { font-weight: 600; }
+.nowrap { white-space: nowrap; }

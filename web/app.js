@@ -910,6 +910,8 @@ async function adminSettings(pane) {
       <option value="both" ${s.report_language === 'both' ? 'selected' : ''}>${esc(t('both'))}</option>
       <option value="fr" ${s.report_language === 'fr' ? 'selected' : ''}>Français</option>
       <option value="en" ${s.report_language === 'en' ? 'selected' : ''}>English</option></select></label>
+    ${'report_formats' in s ? `<label class="field"><span class="lbl">${esc(t('reportFiles'))}</span><select class="input" name="report_formats">
+      ${[['both', t('filesBoth')], ['pdf', 'PDF'], ['docx', 'Word (.docx)']].map(([v, l]) => `<option value="${v}" ${s.report_formats === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>` : ''}
     </div>
     <label class="field"><span class="lbl">${esc(t('alertEmails'))}</span><input class="input" name="alert_emails" value="${esc((s.alert_emails || []).join(', '))}"></label>
     <label class="field"><span class="lbl">${esc(t('category'))}</span><textarea class="input" name="categories" rows="9" style="font-family:ui-monospace,monospace;font-size:14px">${esc(catsText)}</textarea>
@@ -925,22 +927,69 @@ async function adminSettings(pane) {
       daily_time: fd.get('daily_time'), no_input_time: fd.get('no_input_time'), weekly_day: Number(fd.get('weekly_day')), weekly_time: fd.get('weekly_time'),
       sender_name: String(fd.get('sender_name')).trim(), report_language: fd.get('report_language'),
       alert_emails: String(fd.get('alert_emails')).split(',').map((x) => x.trim().toLowerCase()).filter(Boolean), categories,
+      ...(fd.get('report_formats') ? { report_formats: fd.get('report_formats') } : {}),
     };
     const { error: er } = await sb.from('settings').update(patch).eq('id', 1);
     if (er) return fail(er); state.settings = { ...state.settings, ...patch }; toast(t('settingsSaved'));
   }); };
 }
 
+// Manual report: the database asks GitHub to run the report engine (about 1–2 minutes).
+function genReportCard() {
+  const today = localDate();
+  return `<form class="card stack" id="genForm"><h2 class="st-h">${icon('file')}${esc(t('genReport'))}</h2>
+    <div class="form-grid two">
+      <label class="field"><span class="lbl">${esc(t('bloc'))}</span><select class="input" name="bloc"><option value="">${esc(t('allBlocs'))}</option>
+        ${state.blocs.filter((b) => b.active).map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></label>
+      <label class="field"><span class="lbl">${esc(t('type'))}</span><select class="input" name="type">
+        <option value="daily">${esc(t('daily'))}</option><option value="weekly">${esc(t('weekly'))}</option></select></label>
+      <label class="field"><span class="lbl">${esc(t('reportDate'))}</span><input class="input" type="date" name="date" value="${today}" max="${today}" required>
+        <span class="hint" id="genHint">${esc(t('dailyHint'))}</span></label>
+      <label class="check" style="align-self:end"><input type="checkbox" name="send">${esc(t('sendToRecipients'))}</label>
+    </div>
+    <div class="row"><button class="btn primary" type="submit">${icon('file')}${esc(t('generate'))}</button></div>
+    <div id="genList"></div></form>`;
+}
+async function bindGenReport(pane) {
+  const f = pane.querySelector('#genForm'); if (!f) return;
+  f.type.onchange = () => { pane.querySelector('#genHint').textContent = t(f.type.value === 'weekly' ? 'weeklyHint' : 'dailyHint'); };
+  const list = pane.querySelector('#genList');
+  let timer = null;
+  const show = async () => {
+    const { data, error } = await sb.from('report_requests').select('*').order('created_at', { ascending: false }).limit(5);
+    if (error) { list.innerHTML = `<p class="small muted">${esc(t('genNeedsSetup'))}</p>`; return false; }
+    list.innerHTML = (data || []).length ? `<ul class="req-list">${data.map((r) => {
+      const st = { queued: t('stQueued'), running: t('stRunning'), done: t('stDone'), error: t('stError') }[r.status] || r.status;
+      const links = (r.result || []).map((x) => `<span class="req-res">${esc(x.bloc)}: ${x.pdf_link ? `<a href="${esc(x.pdf_link)}" target="_blank" rel="noopener">PDF</a>` : ''}${x.pdf_link && x.docx_link ? ' · ' : ''}${x.docx_link ? `<a href="${esc(x.docx_link)}" target="_blank" rel="noopener">Word</a>` : ''}${x.status === 'sent' ? ` · ${esc(t('emailed'))}` : ''}${x.status === 'no_recipients' ? ` · ${esc(t('noRecipientsShort'))}` : ''}</span>`).join('');
+      return `<li><span class="badge ${r.status === 'done' ? 'st-closed' : r.status === 'error' ? 'sev-critical' : 'st-open'}">${esc(st)}</span>
+        <span>${esc(r.type === 'weekly' ? t('weekly') : t('daily'))} · ${esc(r.bloc_id ? blocName(r.bloc_id) : t('allBlocs'))} · ${esc(r.period_date)}${r.send_email ? ` · ${esc(t('emailed'))}` : ''}</span>
+        ${links ? `<span class="req-links">${links}</span>` : ''}${r.status === 'error' && r.error ? `<span class="small" style="color:var(--danger)">${esc(r.error.slice(0, 160))}</span>` : ''}</li>`;
+    }).join('')}</ul>` : '';
+    return (data || []).some((r) => r.status === 'queued' || r.status === 'running');
+  };
+  const poll = async () => { clearTimeout(timer); if (!document.body.contains(list)) return; if (await show()) timer = setTimeout(poll, 6000); };
+  poll();
+  f.onsubmit = (e) => { e.preventDefault(); busy(f.querySelector('[type=submit]'), async () => {
+    const fd = new FormData(f);
+    if (fd.get('send') && !confirm(t('confirmSend'))) return;
+    const { error } = await sb.from('report_requests').insert({ bloc_id: fd.get('bloc') ? Number(fd.get('bloc')) : null, type: fd.get('type'), period_date: fd.get('date'), send_email: !!fd.get('send') });
+    if (error) return fail(error);
+    toast(t('requestQueued')); poll();
+  }); };
+}
+
 async function adminReports(pane) {
   const { data, error } = await sb.from('reports').select('*').order('sent_at', { ascending: false }).limit(60);
   if (error) throw error;
-  pane.innerHTML = `<div class="card" style="overflow-x:auto"><table class="table"><thead><tr><th>${esc(t('sentAt'))}</th><th>${esc(t('bloc'))}</th><th>${esc(t('type'))}</th><th>${esc(t('period'))}</th><th>${esc(t('recipients'))}</th><th>PDF</th></tr></thead><tbody>
+  pane.innerHTML = `${genReportCard()}
+    <div class="card" style="overflow-x:auto"><table class="table"><thead><tr><th>${esc(t('sentAt'))}</th><th>${esc(t('bloc'))}</th><th>${esc(t('type'))}</th><th>${esc(t('period'))}</th><th>${esc(t('recipients'))}</th><th>${esc(t('files'))}</th></tr></thead><tbody>
     ${(data || []).length ? data.map((r) => `<tr><td>${esc(fmtDateTime(r.sent_at))}</td><td>${esc(blocName(r.bloc_id))}</td><td>${esc(r.type)}${r.status !== 'sent' ? ` <span class="badge sev-high">${esc(r.status)}</span>` : ''}</td><td>${esc(r.period)}</td>
       <td class="small">${esc((r.recipients || []).join(', '))}${r.note ? `<br><span class="muted">${esc(r.note)}</span>` : ''}</td>
-      <td>${r.pdf_link ? `<a href="${esc(r.pdf_link)}" target="_blank" rel="noopener">${icon('ext')}<span class="sr">PDF</span></a>` : ''}</td></tr>`).join('')
+      <td class="nowrap">${r.pdf_link ? `<a href="${esc(r.pdf_link)}" target="_blank" rel="noopener">PDF</a>` : ''}${r.docx_link ? ` · <a href="${esc(r.docx_link)}" target="_blank" rel="noopener">Word</a>` : ''}</td></tr>`).join('')
       : `<tr><td colspan="6" class="muted">${esc(t('none'))}</td></tr>`}</tbody></table></div>
     <h2 class="st-h" style="margin-top:24px">${icon('trash')}${esc(t('deletedLog'))}</h2>
     <div class="card" style="overflow-x:auto" id="delLog"><p class="muted">…</p></div>`;
+  bindGenReport(pane);
   const { data: dl, error: de } = await sb.from('deleted_observations').select('*').order('deleted_at', { ascending: false }).limit(100);
   const box = pane.querySelector('#delLog');
   if (de) { box.innerHTML = `<p class="muted small">${esc(t('none'))}</p>`; return; }

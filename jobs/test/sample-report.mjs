@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises';
 import sharp from 'sharp';
 import { buildDailyPdf, buildWeeklyPdf, prepareBrand } from '../lib/pdf.mjs';
+import { buildDailyDocx, buildWeeklyDocx } from '../lib/docx.mjs';
 import { findHotspots, countBy, dailySummary, weeklyStats, weeklySummary } from '../lib/analysis.mjs';
 import { makeTr } from '../lib/text.mjs';
 import { mapSnapshot } from '../lib/mapimg.mjs';
@@ -51,6 +52,7 @@ const ctx = { tr, trs, bloc, settings, photos, brand: await prepareBrand(brand),
 await fs.mkdir('out', { recursive: true });
 const pdf = await buildDailyPdf(d, ctx);
 await fs.writeFile('out/sample-daily.pdf', pdf);
+const docx = await buildDailyDocx(d, ctx); await fs.writeFile('out/sample-daily.docx', docx); console.log('daily docx', docx.length, 'bytes');
 console.log('daily', pdf.length, 'bytes; summary:', trs.map((t) => t.summaryDaily));
 
 const week = [...today, ...history, ...carried];
@@ -63,3 +65,4 @@ const wpdf = await buildWeeklyPdf({ stats, hotspots, openNow: 6, openList: carri
   { ...ctx, trs: wtrs, periodLabel: '18/11/2026 – 24/11/2026' });
 await fs.writeFile('out/sample-weekly.pdf', wpdf);
 console.log('weekly', wpdf.length, 'bytes');
+const wdocx = await buildWeeklyDocx({ stats, hotspots, openNow: 6, openList: carried, mapImg: d.mapImg }, { ...ctx, trs: wtrs, periodLabel: '18/11/2026 – 24/11/2026' }); await fs.writeFile('out/sample-weekly.docx', wdocx); console.log('weekly docx', wdocx.length, 'bytes');

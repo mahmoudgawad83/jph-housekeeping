@@ -12,14 +12,18 @@ import { zonedParts, startOfDay, addDays, toMinutes, fmtLocal, fmtYmd } from './
 import { findHotspots, countBy, dailySummary, weeklyStats, weeklySummary } from './lib/analysis.mjs';
 import { makeTr } from './lib/text.mjs';
 import { buildDailyPdf, buildWeeklyPdf, prepareBrand } from './lib/pdf.mjs';
+import { buildDailyDocx, buildWeeklyDocx } from './lib/docx.mjs';
 import { mapSnapshot } from './lib/mapimg.mjs';
 import { driveEnabled, folderPath, upload } from './lib/drive.mjs';
 import { emailEnabled, sendEmail } from './lib/email.mjs';
 
 const { values: args } = parseArgs({ options: {
   force: { type: 'string' }, date: { type: 'string' }, bloc: { type: 'string' }, 'dry-run': { type: 'boolean', default: false },
+  request: { type: 'string' }, 'no-email': { type: 'boolean', default: false },
 } });
 const DRY = args['dry-run'];
+const NO_EMAIL = args['no-email'];          // manual report from the app: build + archive only
+const REQUEST = args.request ? Number(args.request) : null;
 const BUCKET = 'photos';
 const MAX_ATTACH = 9.5 * 1024 * 1024;
 
@@ -79,7 +83,11 @@ async function alreadySent(blocId, type, period) {
 }
 async function record(row) {
   if (DRY) return;
-  must(await sb.from('reports').upsert(row, { onConflict: 'bloc_id,type,period' }));
+  let res = await sb.from('reports').upsert(row, { onConflict: 'bloc_id,type,period' });
+  if (res.error && /docx_link/.test(res.error.message)) { // database not yet updated for Word links
+    const { docx_link, ...rest } = row; res = await sb.from('reports').upsert(rest, { onConflict: 'bloc_id,type,period' });
+  }
+  must(res);
 }
 const obsQuery = (blocId) => sb.from('observations').select('*').eq('bloc_id', blocId);
 
@@ -148,35 +156,56 @@ function emailHtml(title, sub, paragraphs, driveLink, extra = '') {
   ${paragraphs.map((p, i) => `<p style="margin:0 0 10px;line-height:1.5;${i ? 'color:#475569' : ''}">${e(p)}</p>`).join('')}
   ${extra}
   ${driveLink ? `<p style="margin:16px 0 0"><a href="${e(driveLink)}" style="color:#1D4ED8">${e(tr('emailDrive'))}</a></p>` : ''}
+  ${extra}
   <p style="margin:16px 0 0;color:#475569;font-size:13px">${e(tr('emailIntro'))}</p></div></div>`;
 }
 
-async function deliver({ bloc, type, period, subject, title, sub, paragraphs, build, recipients }) {
-  let pdf = await build({ px: 900, q: 70 });
-  if (pdf.length > MAX_ATTACH) pdf = await build({ px: 600, q: 55 });
-  const filename = `${bloc.name.replace(/\s+/g, '_')}_${type}_${period}.pdf`;
-  if (DRY) { await fs.mkdir('out', { recursive: true }); await fs.writeFile(`out/${filename}`, pdf); log('wrote', `out/${filename}`, `${(pdf.length / 1024).toFixed(0)} KB`); return; }
-  let pdfLink = null;
+async function deliver({ bloc, type, period, subject, title, sub, paragraphs, build, buildDocx, recipients }) {
+  const formats = settings.report_formats || 'both';
+  const wantPdf = formats !== 'docx', wantDocx = formats !== 'pdf';
+  const base = `${bloc.name.replace(/\s+/g, '_')}_${type}_${period}`;
+  let pdf = null, docx = null;
+  if (wantPdf) { pdf = await build({ px: 900, q: 70 }); if (pdf.length > MAX_ATTACH) pdf = await build({ px: 600, q: 55 }); }
+  if (wantDocx) { try { docx = await buildDocx(); } catch (e) { log('Word build failed', e.message); if (!pdf) throw e; } }
+  if (DRY) {
+    await fs.mkdir('out', { recursive: true });
+    if (pdf) await fs.writeFile(`out/${base}.pdf`, pdf);
+    if (docx) await fs.writeFile(`out/${base}.docx`, docx);
+    log('wrote', base, pdf ? `pdf ${(pdf.length / 1024).toFixed(0)} KB` : '', docx ? `docx ${(docx.length / 1024).toFixed(0)} KB` : '');
+    return { bloc: bloc.name, status: 'dry-run' };
+  }
+  let pdfLink = null, docxLink = null;
   if (driveEnabled) {
-    try { pdfLink = await upload(pdf, filename, 'application/pdf', await folderPath([bloc.name, 'Reports'])); }
-    catch (e) { log('PDF upload failed', e.message); }
+    const folder = await folderPath([bloc.name, 'Reports']).catch((e) => { log('Drive folder failed', e.message); return null; });
+    if (folder && pdf) { try { pdfLink = await upload(pdf, `${base}.pdf`, 'application/pdf', folder); } catch (e) { log('PDF upload failed', e.message); } }
+    if (folder && docx) { try { docxLink = await upload(docx, `${base}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', folder); } catch (e) { log('Word upload failed', e.message); } }
+  }
+  if (NO_EMAIL) {
+    log(`${type} ${bloc.name} ${period}: generated (not e-mailed)`);
+    return { bloc: bloc.name, status: 'generated', pdf_link: pdfLink, docx_link: docxLink };
   }
   const to = recipients.map((r) => ({ email: r.email, name: r.name }));
   let status = 'sent', note = '';
   if (!to.length) { status = 'no_recipients'; }
   else if (!emailEnabled) { status = 'email_not_configured'; }
   else {
-    const attach = pdf.length <= MAX_ATTACH;
-    if (!attach) note = tr('pdfTooBig');
+    // Attach both files when they fit; otherwise the PDF only and the Word file as a Drive link.
+    const attachments = [];
+    let size = 0, wordAsLink = false;
+    if (pdf && pdf.length <= MAX_ATTACH) { attachments.push({ filename: `${base}.pdf`, content: pdf }); size += pdf.length; }
+    if (docx) { if (size + docx.length <= MAX_ATTACH) attachments.push({ filename: `${base}.docx`, content: docx }); else wordAsLink = true; }
+    if (pdf && pdf.length > MAX_ATTACH) note = tr('pdfTooBig');
+    const e = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const extra = wordAsLink && docxLink ? `<p style="margin:12px 0 0"><a href="${e(docxLink)}" style="color:#1D4ED8">${e(tr('wordLink'))}</a></p>` : '';
     try {
       await sendEmail({ to, subject, senderName: settings.sender_name,
-        html: emailHtml(title, sub, attach ? paragraphs : [...paragraphs, note], pdfLink),
-        attachments: attach ? [{ filename, content: pdf }] : [] });
-    } catch (e) { status = 'error'; note = e.message.slice(0, 500); log('email failed', e.message); }
+        html: emailHtml(title, sub, note ? [...paragraphs, note] : paragraphs, pdfLink || docxLink, extra), attachments });
+    } catch (err) { status = 'error'; note = err.message.slice(0, 500); log('email failed', err.message); }
   }
-  await record({ bloc_id: bloc.id, type, period, pdf_link: pdfLink, recipients: to.map((x) => x.email), status, note, sent_at: new Date().toISOString() });
+  await record({ bloc_id: bloc.id, type, period, pdf_link: pdfLink, docx_link: docxLink, recipients: to.map((x) => x.email), status, note, sent_at: new Date().toISOString() });
   log(`${type} ${bloc.name} ${period}: ${status} → ${to.length} recipient(s)`);
   if (status === 'error') throw new Error(note);
+  return { bloc: bloc.name, status, pdf_link: pdfLink, docx_link: docxLink };
 }
 
 async function sendDaily(bloc, ymd) {
@@ -187,7 +216,7 @@ async function sendDaily(bloc, ymd) {
   const ctx = { tr, trs, bloc, settings, photos, person, fmtTime, fmtDateTime, brand: await loadBrand(),
     ymdLabel: fmtYmd(ymd), generatedLabel: `${tr('generated')} ${fmtDateTime(new Date())}` };
   const recipients = must(await sb.from('bloc_recipients').select('*').eq('bloc_id', bloc.id).eq('daily', true));
-  await deliver({ bloc, type: 'daily', period: ymd, recipients,
+  return deliver({ bloc, type: 'daily', period: ymd, recipients, buildDocx: () => buildDailyDocx(d, ctx),
     subject: `${tr.only(langs[0])('daily')} – ${bloc.name} – ${fmtYmd(ymd)}${d.noInput ? ' – ' + tr.only(langs[0])('noInputTitle') : ''}`,
     title: tr('daily'), sub: `${bloc.name} · ${fmtYmd(ymd)}`, paragraphs: trs.map((t) => t.summaryDaily),
     build: (opts) => buildDailyPdf(d, ctx, opts) });
@@ -213,7 +242,8 @@ async function sendWeekly(bloc, ymd) {
   const periodLabel = `${fmtYmd(startY)} – ${fmtYmd(addDays(endY, -1))}`;
   const ctx = { tr, trs, bloc, settings, person, fmtDateTime, periodLabel, brand: await loadBrand(), generatedLabel: `${tr('generated')} ${fmtDateTime(new Date())}` };
   const recipients = must(await sb.from('bloc_recipients').select('*').eq('bloc_id', bloc.id).eq('weekly', true));
-  await deliver({ bloc, type: 'weekly', period, recipients,
+  const wdata = { stats, hotspots, openNow: openList.length, openList: openList.slice(0, 60), mapImg };
+  return deliver({ bloc, type: 'weekly', period, recipients, buildDocx: () => buildWeeklyDocx(wdata, ctx),
     subject: `${tr.only(langs[0])('weekly')} – ${bloc.name} – ${periodLabel}`,
     title: tr('weekly'), sub: `${bloc.name} · ${periodLabel}`, paragraphs: trs.map((t) => t.summaryWeekly),
     build: () => buildWeeklyPdf({ stats, hotspots, openNow: openList.length, openList: openList.slice(0, 60), mapImg }, ctx) });
@@ -264,7 +294,10 @@ async function cleanup() {
 
 // ───────── Main ─────────
 const errors = [];
-const attempt = async (label, fn) => { try { await fn(); } catch (e) { errors.push(`${label}: ${e.message}`); log('ERROR', label, e.stack || e.message); } };
+const results = [];
+const attempt = async (label, fn) => { try { const r = await fn(); if (r && r.bloc) results.push(r); } catch (e) { errors.push(`${label}: ${e.message}`); log('ERROR', label, e.stack || e.message); } };
+const setRequest = async (patch) => { if (REQUEST && !DRY) await sb.from('report_requests').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', REQUEST); };
+await setRequest({ status: 'running' });
 
 if (args.force) await attempt('archive', archive); // a manual run also archives photos, so links are in the report
 
@@ -285,5 +318,7 @@ if (args.force === 'daily') {
   }
   await attempt('cleanup', cleanup);
 }
+await setRequest(errors.length && !results.length ? { status: 'error', error: errors.join('\n').slice(0, 1000), result: results }
+  : { status: 'done', result: results, error: errors.length ? errors.join('\n').slice(0, 1000) : null });
 if (errors.length) { console.error('Finished with errors:\n' + errors.join('\n')); process.exit(1); }
 log('Done');

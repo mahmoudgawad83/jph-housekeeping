@@ -1,5 +1,5 @@
 // App-shell cache: the app opens even with a weak connection. Data calls are never cached.
-const CACHE = 'jph-v16';
+const CACHE = 'jph-v17';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'i18n.js', 'config.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'brand/jesa-logo.png', 'brand/bg.jpg'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

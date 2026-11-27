@@ -18,6 +18,16 @@ on:
         description: 'Test only: build PDFs without sending (download them from the run page)'
         type: boolean
         default: false
+      date:
+        description: 'Report date YYYY-MM-DD (empty = today; weekly = the 7 days before it)'
+        required: false
+      send_email:
+        description: 'E-mail the report to the recipients'
+        type: boolean
+        default: true
+      request_id:
+        description: 'Internal: app request number'
+        required: false
 concurrency: { group: reports, cancel-in-progress: false }
 jobs:
   run:
@@ -45,7 +55,10 @@ jobs:
           if [ -n "${{ inputs.force }}" ] && [ "${{ inputs.force }}" != "normal" ]; then ARGS+=(--force "${{ inputs.force }}"); fi
           if [ -n "${{ inputs.bloc }}" ]; then ARGS+=(--bloc "${{ inputs.bloc }}"); fi
           if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS+=(--dry-run); fi
+          if [ -n "${{ inputs.date }}" ]; then ARGS+=(--date "${{ inputs.date }}"); fi
+          if [ "${{ inputs.send_email }}" = "false" ]; then ARGS+=(--no-email); fi
+          if [ -n "${{ inputs.request_id }}" ]; then ARGS+=(--request "${{ inputs.request_id }}"); fi
           node run.mjs "${ARGS[@]}"
       - if: ${{ inputs.dry_run }}
         uses: actions/upload-artifact@v4
-        with: { name: test-reports, path: jobs/out/*.pdf }
+        with: { name: test-reports, path: 'jobs/out/*' }
